@@ -6,4 +6,7 @@ services:
     environment:
       UPLOAD_DIR: /opt/srv/uploads
     volumes:
-      - .:/opt/src
+      - .:/opt/srv
+    ports:
+      - 80:5000
+

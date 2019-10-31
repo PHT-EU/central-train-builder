@@ -63,9 +63,10 @@ class BuildUpload(Resource):
 
 @build.route('/')
 class BuildPost(Resource):
-    @build.doc('Post build request')
+    @build.doc('Post build request JSON')
     @build.response(_BAD_REQUEST, 'If the build request is invalid')
-    @build.response(_CREATED, 'If the file was uploaded successfully')
+    @build.response(_CREATED, 'If the POST request was successful')
+    @build.header('Accept', 'application/json')
     def post(self):
         if request.data:
             data = request.data
@@ -81,19 +82,6 @@ class BuildPost(Resource):
             return Response(status=201)
         else:
             bad_request()
-
-# @api.route('/<id>')
-# @api.param('id', 'The cat identifier')
-# @api.response(404, 'Cat not found')
-# class Cat(Resource):
-#     @api.doc('get_cat')
-#     @api.marshal_with(cat)
-#     def get(self, id):
-#         '''Fetch a cat given its identifier'''
-#         for cat in CATS:
-#             if cat['id'] == id:
-#                 return cat
-#         api.abort(404)
 
 
 if __name__ == '__main__':
