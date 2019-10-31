@@ -1,0 +1,9 @@
+version: "3.7"
+
+services:
+  trainbuilder:
+    build: .
+    environment:
+      UPLOAD_DIR: /opt/srv/uploads
+    volumes:
+      - .:/opt/src
