@@ -62,21 +62,29 @@ class TrainBuilder:
             encrypted_file = fernet.encrypt(f.read())
         return encrypted_file
 
-    def create_key_file(self, user_id: str, user_pk, user_signature, session_key, route):
+    def create_key_file(self, user_id: str, user_pk: bytes, user_signature, session_key, route):
         """
 
         :param user_id: id of the user creating the train
-        :param user_pk: public key provided by the user
+        :param user_pk: public key provided by the user bytes in PEM format
         :param user_signature: signature created with the offline tool using the users private key
         :return: dictionary representing the key file used for validation
         """
         encrypted_session_key = self.encrypt_session_key(session_key, route)
+        station_public_keys = self.get_station_public_keys(self.vault_url, route)
         keys = {
             "user_id": user_id,
             "session_id": os.urandom(64),
             "user_signature": user_signature,
-            "user_public_key": user_pk,
-            "encrypted_symmetric_key": encrypted_session_key
+            "rsa_user_public_key": user_pk,
+            "encrypted_key": encrypted_session_key,
+            "rsa_public_keys": station_public_keys,
+            "e_h": None,
+            "e_h_sig": None,
+            "e_d": None,
+            "e_d_sig": None,
+            "digital_signature": None
+
         }
         return keys
 
@@ -172,3 +180,9 @@ if __name__ == '__main__':
     # keys = tb.get_station_public_keys("https://vault.lukaszimmermann.dev/v1/cubbyhole/station_public_keys", [1, 2, 3])
     sym_key = Fernet.generate_key()
     print(tb.encrypt_session_key(sym_key, [1, 2, 3]))
+
+    with open("/home/michaelgraf/Desktop/train-user-client/rsa_public_key" "rb") as f:
+        user_pk = f.read()
+    keys = tb.create_key_file("123456", user_pk, )
+    tb._save_key_file(keys)
+
