@@ -6,6 +6,8 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
+import json
+import io
 
 
 class TrainBuilder:
@@ -16,7 +18,8 @@ class TrainBuilder:
         self.vault_url = vault_url
         self.hash = None
 
-    def build_train(self, algorithm: list, query: list, route: list, user_id: str, user_pk: bytes, base_img: str, user_sig):
+    def build_train(self, algorithm: list, query: list, route: list, user_id: str, user_pk: bytes, base_img: str,
+                    user_sig):
         """
 
         :param algorithm: list of file paths of user submitted algorithm files
@@ -31,21 +34,33 @@ class TrainBuilder:
 
         # Generate random number for session id, is this the right place?
         session_id = os.urandom(64)
-        self.hash = self.calculate_hash(user_id, algorithm, query, route, session_id)
-        # TODO how to use communation with the central service here ( async communication)
+        # self.hash = self.calculate_hash(user_id, algorithm, query, route, session_id)
+        # # TODO how to use communation with the central service here ( async communication)
+        #
+        # # encrypt the query files before adding them to the image
+        # session_key = Fernet.generate_key()
+        # fernet = Fernet(session_key)
+        # for file in query:
+        #     self.encrypt_file(fernet, file)
+        #
+        #
+        # # create keyfile and store it in pickled form
+        # keys = self.create_key_file(user_id, user_pk, user_sig, )
+        client = docker.client.from_env()
+        self.create_temp_dockerfile("hello")
 
-        # encrypt the query files before adding them to the image
-        session_key = Fernet.generate_key()
-        fernet = Fernet(session_key)
-        for file in query:
-            self.encrypt_file(fernet, file)
+        return client.images.build(path=".")
 
+    def create_temp_dockerfile(self, web_service_message):
+        """
 
-        # create keyfile and store it in pickled form
-        keys = self.create_key_file(user_id, user_pk, user_sig, )
-
-    def create_temp_dockerfile(self, algorithm, query, route, base_img, key_file):
-        pass
+        :param endpoints: Dictionary created from message from webservice containing  all files defining the file
+        structure of the train
+        :return:
+        """
+        with open("Dockerfile", "w") as f:
+            f.write("FROM harbor.lukaszimmermann.dev/pht_master/python:3.8.1-alpine3.11 \n")
+            f.write("COPY entrypoint.py entrypoint.py\n")
 
     # TODO create keyfile as file, copy it to the image and delete it after
 
@@ -56,11 +71,10 @@ class TrainBuilder:
         :param file:
         :return:
         """
-        # TODO save the encrypted files at the same place as the original file?
-        # would make it easier to not handle additional file paths
         with open(file, "rb") as f:
             encrypted_file = fernet.encrypt(f.read())
-        return encrypted_file
+        with open(file, "wb") as f:
+            f.write(encrypted_file)
 
     def create_key_file(self, user_id: str, user_pk: bytes, user_signature, session_key, route):
         """
@@ -151,6 +165,7 @@ class TrainBuilder:
         :param session_id: session id randomly created by TB
         :return: hash value to be signed offline by user
         """
+        # TODO  use json file from central webservice
         hash = hashes.SHA512()
         hasher = hashes.Hash(hash, default_backend())
         hasher.update(user_id.encode())
@@ -179,10 +194,10 @@ if __name__ == '__main__':
     tb = TrainBuilder("https://vault.lukaszimmermann.dev/v1/cubbyhole/station_public_keys")
     # keys = tb.get_station_public_keys("https://vault.lukaszimmermann.dev/v1/cubbyhole/station_public_keys", [1, 2, 3])
     sym_key = Fernet.generate_key()
-    print(tb.encrypt_session_key(sym_key, [1, 2, 3]))
+    route = [1, 2, 3]
+    print(tb.encrypt_session_key(sym_key, route))
 
-    with open("/home/michaelgraf/Desktop/train-user-client/rsa_public_key" "rb") as f:
-        user_pk = f.read()
-    keys = tb.create_key_file("123456", user_pk, )
-    tb._save_key_file(keys)
+    tb.build_train([], [], route, "123456", "pk".encode(), "test_img", "user_sig")
 
+    # keys = tb.create_key_file("123456", )
+    # tb._save_key_file(keys)
