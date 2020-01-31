@@ -18,16 +18,9 @@ class TrainBuilder:
         self.vault_url = vault_url
         self.hash = None
 
-    def build_train(self, algorithm: list, query: list, route: list, user_id: str, user_pk: bytes, base_img: str,
-                    user_sig):
+    def build_train(self, web_service_json):
         """
-
-        :param algorithm: list of file paths of user submitted algorithm files
-        :param query: list of file paths of queries specified by the user
-        :param route: list of PID of stations contained in the route
-        :param user_id: id of the user
-        :param user_pk: RSA public key provided by the user
-        :param base_img: tag specifying the base image to use for the train image
+        :param web_service_json: The message received from the
         :return: docker image of the final train
         """
         # TODO build docker image based on given values
@@ -38,20 +31,24 @@ class TrainBuilder:
         # # TODO how to use communation with the central service here ( async communication)
         #
         # # encrypt the query files before adding them to the image
-        # session_key = Fernet.generate_key()
-        # fernet = Fernet(session_key)
-        # for file in query:
-        #     self.encrypt_file(fernet, file)
-        #
-        #
-        # # create keyfile and store it in pickled form
-        # keys = self.create_key_file(user_id, user_pk, user_sig, )
+        session_key = Fernet.generate_key()
+
+
+        message = json.loads(web_service_json)
+        fernet = Fernet(session_key)
+        for file in message["query_files"]:
+            self.encrypt_file(fernet, file)
+
+
+        # create keyfile and store it in pickled form
+        keys = self.create_key_file(message["user_id"], message["user_public_key"],
+                                    message["user_signature"], session_key, message["route"])
         client = docker.client.from_env()
         self.create_temp_dockerfile("hello")
 
         return client.images.build(path=".")
 
-    def create_temp_dockerfile(self, web_service_message):
+    def create_temp_dockerfile(self, entrypoints, query_files):
         """
 
         :param endpoints: Dictionary created from message from webservice containing  all files defining the file
@@ -155,12 +152,26 @@ class TrainBuilder:
         public_key = serialization.load_pem_public_key(key, backend=default_backend())
         return public_key
 
-    def calculate_hash(self, user_id, algorithm_files, query_files, route, session_id):
+    @staticmethod
+    def _get_all_file_paths(message):
+        """
+        Parses the message received from the webservice and  returns  a list of all files to be hashed
+        :param message:
+        :return: list of files to be hashed
+        """
+        files = []
+        for endpoint in message["endpoints"]:
+            for command in endpoint["commands"]:
+                files.append(command["files"])
+        files.append(message["query_files"])
+
+        return files
+
+    def calculate_hash(self, user_id, files, route, session_id):
         """
 
         :param user_id: String value of the user id
-        :param algorithm_files: list of file paths for the algorithm files provided by the user
-        :param query_files: list of file paths for query files provided by the user(both on server)
+        :param files: files to be hashed (algorithm and query files)
         :param route: route containing PIDs of stations included in the analysis
         :param session_id: session id randomly created by TB
         :return: hash value to be signed offline by user
@@ -169,8 +180,7 @@ class TrainBuilder:
         hash = hashes.SHA512()
         hasher = hashes.Hash(hash, default_backend())
         hasher.update(user_id.encode())
-        self.hash_files(hasher, algorithm_files)
-        self.hash_files(hasher, query_files)
+        self.hash_files(hasher, files)
         hasher.update(bytes(route))
         hasher.update(session_id)
         digest = hasher.finalize()
