@@ -11,6 +11,7 @@ def create_json_message():
 
     message = {
         "user_id": "123456",
+        # String representation of user public key
         "user_public_key": user_pk.decode(),
         "user_signature": user_signature,
         "route": [1,2,3],
@@ -25,25 +26,25 @@ def create_json_message():
              "commands": [
                  {"name": "run",
                   # List of file paths associated with the command
-                  "files": []},
+                  "files": ["entrypoint.py", "readme.md"]},
              ]},
             {"name": "collect_envvar",
              # List of dictionaries of commands (mostly only run for now)
              "commands": [
                  {"name": "run",
                   # List of file paths associated with the command
-                  "files": []},
+                  "files": ["entrypoint.py", "readme.md"]},
              ]},
             {"name": "hello_world",
              # List of dictionaries of commands (mostly only run for now)
              "commands": [
                  {"name": "run",
                   # List of file paths associated with the command
-                  "files": []},
+                  "files": ["entrypoint.py", "readme.md"]},
              ]},
         ],
         # List of file paths of query files passed to webservice
-        "query_files": [],
+        "query_files": ["query1", "query2"],
 
     }
     return json.dumps(message, indent=4)
