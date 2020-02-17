@@ -3,6 +3,11 @@ import json
 
 def create_json_message():
 
+    """
+    Generating a simluated message from the webservice also defining json structure for communication
+    :return:
+    """
+
     with open("/home/michaelgraf/Desktop/train-user-client/rsa_public_key", "rb") as f:
         user_pk = f.read()
 
@@ -10,13 +15,17 @@ def create_json_message():
     user_signature = "user_signature"
 
     message = {
+        # String containing USER ID
         "user_id": "123456",
+        # String containing Train ID
+        "train_id": "1",
         # String representation of user public key
         "user_public_key": user_pk.decode(),
+        # Signature created with the offline tool.
         "user_signature": user_signature,
         "route": [1,2,3],
         # specify which of the provided master images to use
-        "base_image": "harbor.lukaszimmermann.dev/pht_master/python:3.8.1-alpine3.11",
+        "master_image": "harbor.lukaszimmermann.dev/pht_master/python:3.8.1-alpine3.11",
         # Path where all the files including the generated dockerfile will be stored
         "root_path": "/home/michaelgraf/Desktop/TrainBuilder/train-builder/tb_new",
         # Arbitrary length list of dictionaries of endpoints contained in train image

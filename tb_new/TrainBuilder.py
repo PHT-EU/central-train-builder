@@ -18,8 +18,9 @@ class TrainBuilder:
         # docker login
         self.vault_url = vault_url
         self.hash = None
+        self.registry_url = "harbor.lukaszimmermann.dev"
 
-    def build_train(self, web_service_json):
+    def build_train(self, web_service_json, user_signature):
         """
         :param web_service_json: The message received from the
         :return: docker image of the final train
@@ -28,44 +29,70 @@ class TrainBuilder:
 
         # Generate random number for session id, is this the right place?
         session_id = os.urandom(64)
-        # self.hash = self.calculate_hash(user_id, algorithm, query, route, session_id)
-        # # TODO how to use communation with the central service here ( async communication)
-        #
+        hash = self.provide_hash(web_service_json, session_id)
+        # # TODO how communicate with the central service here ( async communication)
+        # TODO need to wait for user to provide the signed hash before creating the keyfile etc
         # # encrypt the query files before adding them to the image
         session_key = Fernet.generate_key()
 
         message = json.loads(web_service_json)
-
 
         fernet = Fernet(session_key)
         # for file in message["query_files"]:
         #     self.encrypt_file(fernet, file)
 
         # create keyfile and store it in pickled form
-        keys = self.create_key_file(message["user_id"], message["user_public_key"],
-                                    message["user_signature"], session_key, message["route"])
+        self.create_key_file(message["user_id"], message["user_public_key"],
+                             message["user_signature"], session_key, message["route"], message["train_id"])
         client = docker.client.from_env()
-        self.create_temp_dockerfile(message, "keyfile")
+        self.create_temp_dockerfile(message, "KeyFile")
+        image = client.images.build(path=".", tag=message["train_id"])
+        # Remove KeyFile after image has been built successfully
+        os.remove("KeyFile")
+        # TODO also remove other files
+        self.push_train(message["train_id"], client, message["route"][0])
 
-        return client.images.build(path=".")
+        # TODO remove image after pushing successfully
+
+        return image
+
+    def provide_hash(self, web_service_json, session_id):
+        """
+        Calculates the hash based on the user provided files and returns it for signing by the user
+        :param web_service_json:
+        :return:
+        """
+        files = self._get_files(web_service_json)
+        self.generate_hash(web_service_json["user_id"], files, web_service_json["route"], session_id)
+        return self.hash
+
+    def push_train(self, tag, client, first_station):
+        # TODO load registry auth stuff from dockerconfig?
+        try:
+            client.login("username", "password", "email", self.registry_url, reauth=True)
+        except docker.errors.APIError:
+            print("Something went wrong logging in, check docker config etc")
+            # TODO sensibly handle error
+
+        # TODO check if this works
+        client.images.push(repository="harbor.likaszimmermann.dev" + "/" + first_station, tag=tag)
 
     def create_temp_dockerfile(self, web_service_json, key_file_path):
         """
-
+        Creates a dockerfile to build a train image
         :param endpoints: Dictionary created from message from webservice containing  all files defining the file
         structure of the train
         :return:
         """
         with open("Dockerfile", "w") as f:
-            f.write("FROM " + web_service_json["base_image"] + "\n")
+            f.write("FROM " + web_service_json["master_image"] + "\n")
             file_paths = self._generate_file_paths(web_service_json)
             for file in file_paths:
                 f.write("COPY " + file[0] + " " + file[1] + "\n")
             f.write("COPY " + key_file_path + " " + os.path.join("/opt/pht_train/", "KeyFile"))
 
-    # TODO create keyfile as file, copy it to the image and delete it after
-
-    def encrypt_file(self, fernet: Fernet, file):
+    @staticmethod
+    def encrypt_file(fernet: Fernet, file):
         """
         Encrypts a file using a provided cryptography fernet object
         :param fernet:
@@ -77,33 +104,30 @@ class TrainBuilder:
         with open(file, "wb") as f:
             f.write(encrypted_file)
 
-    def create_key_file(self, user_id: str, user_pk: str, user_signature, session_key, route):
+    def create_key_file(self, user_id: str, user_pk: str, user_signature, session_key, route, train_id):
         """
-
+        Creates a keyfile given the values provided by the webservice and stores it in the current working  directory
         :param user_id: id of the user creating the train
         :param user_pk: public key provided by the user bytes in PEM format
         :param user_signature: signature created with the offline tool using the users private key
-        :return: dictionary representing the key file used for validation
+        :return:
         """
         encrypted_session_key = self.encrypt_session_key(session_key, route)
         station_public_keys = self.get_station_public_keys(self.vault_url, route)
         keys = {
             "user_id": user_id,
+            "train_id": train_id,
             "session_id": os.urandom(64),
-            "user_signature": user_signature,
             "rsa_user_public_key": user_pk.encode(),
             "encrypted_key": encrypted_session_key,
             "rsa_public_keys": station_public_keys,
-            "e_h": None,
-            "e_h_sig": None,
+            "e_h": self.hash,
+            "e_h_sig": user_signature,
             "e_d": None,
             "e_d_sig": None,
             "digital_signature": None
 
         }
-        return keys
-
-    def _save_key_file(self, keys):
         with open("KeyFile", "wb") as kf:
             pickle.dump(keys, kf)
 
@@ -164,6 +188,23 @@ class TrainBuilder:
         return public_key
 
     @staticmethod
+    def _get_files(message):
+        """
+        Gets the paths (on the server) of all specified files
+        :param message: json message received from the webserver
+        :return: list of file paths of relevant files
+        """
+        files = []
+        for endpoint in message["enpoints"]:
+            for command in endpoint["commands"]:
+                for f in command["files"]:
+                    files.append(f)
+        files.append(message["query_files"])
+
+        return files
+
+
+    @staticmethod
     def _generate_file_paths(message):
         """
         Parses the message received from the webservice and  returns  a list of all files to be hashed
@@ -204,13 +245,14 @@ class TrainBuilder:
         hasher.update(session_id)
         digest = hasher.finalize()
         # TODO make this function set the class value hash maybe
+        self.hash = digest
         return digest
 
     @staticmethod
     def hash_files(hasher: hashes.Hash, files: list):
         for file in files:
             with open(file, "rb") as f:
-                hasher.update(file.read())
+                hasher.update(f.read())
 
     def _get_hash(self):
         if self.hash is not None:
