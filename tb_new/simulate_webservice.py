@@ -1,4 +1,5 @@
 import json
+import cryptography
 
 
 def create_json_message():
@@ -35,21 +36,22 @@ def create_json_message():
              "commands": [
                  {"name": "run",
                   # List of file paths associated with the command
-                  "files": ["entrypoint.py", "readme.md"]},
-             ]},
-            {"name": "collect_envvar",
-             # List of dictionaries of commands (mostly only run for now)
-             "commands": [
-                 {"name": "run",
-                  # List of file paths associated with the command
-                  "files": ["entrypoint.py", "readme.md"]},
+                  "files": ["/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/calculate_sum"
+                            "/commands/run/entrypoint.py",
+                            "/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/calculate_sum"
+                            "/commands/run/entrypoint.py",
+                            "/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/calculate_sum"
+                            "/commands/run/RESOURCES.tsv"]},
              ]},
             {"name": "hello_world",
              # List of dictionaries of commands (mostly only run for now)
              "commands": [
                  {"name": "run",
                   # List of file paths associated with the command
-                  "files": ["entrypoint.py", "readme.md"]},
+                  "files": ["/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/hello_world/commands"
+                            "/run/entrypoint.py",
+                            "/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/hello_world/commands"
+                            "/run/README.md"]},
              ]},
         ],
         # List of file paths of query files passed to webservice

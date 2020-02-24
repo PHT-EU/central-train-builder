@@ -38,8 +38,8 @@ class TrainBuilder:
         message = json.loads(web_service_json)
 
         fernet = Fernet(session_key)
-        # for file in message["query_files"]:
-        #     self.encrypt_file(fernet, file)
+        for file in message["query_files"]:
+            self.encrypt_file(fernet, file)
 
         # create keyfile and store it in pickled form
         self.create_key_file(message["user_id"], message["user_public_key"],
@@ -166,7 +166,7 @@ class TrainBuilder:
         :return: dictionary with statino PIDs as keys and the associated public keys as values
         """
         # TODO replace with secure token
-        vault_token = "s.endLK1VAnlkXsCRfUYjXlwlm"
+        vault_token = ""
         headers = {"X-Vault-Token": vault_token}
         r = requests.get(vault_url, headers=headers)
         keys: dict = r.json()["data"]
@@ -211,7 +211,6 @@ class TrainBuilder:
         :param message:
         :return: list of files to be hashed
         """
-        # TODO create list of tuples containing src path of files on server filesystem and dest path in docker image
         files = []
         query_prefix = "/opt/pht_train/executions/_currently_running/_working"
         endpoint_prefix = "/opt/pht_train/endpoints"
@@ -236,7 +235,6 @@ class TrainBuilder:
         :param session_id: session id randomly created by TB
         :return: hash value to be signed offline by user
         """
-        # TODO  use json file from central webservice
         hash = hashes.SHA512()
         hasher = hashes.Hash(hash, default_backend())
         hasher.update(user_id.encode())
@@ -244,7 +242,6 @@ class TrainBuilder:
         hasher.update(bytes(route))
         hasher.update(session_id)
         digest = hasher.finalize()
-        # TODO make this function set the class value hash maybe
         self.hash = digest
         return digest
 
