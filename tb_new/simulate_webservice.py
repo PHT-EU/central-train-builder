@@ -1,6 +1,6 @@
 import json
 import cryptography
-
+import socketio
 
 def create_json_message():
 
@@ -59,6 +59,25 @@ def create_json_message():
 
     }
     return json.dumps(message, indent=4)
+
+async def simulate_client():
+    sio = socketio.AsyncClient()
+    @sio.event
+    async def connect():
+        print("Connection established")
+
+    @sio.event
+    def my_message(data):
+        print('message received with ', data)
+        sio.emit('my response', {'response': 'my response'})
+
+    @sio.event
+    def disconnect():
+        print('disconnected from server')
+
+    await sio.connect('http://localhost:5000')
+    print('my sid is', sio.sid)
+    sio.wait()
 
 
 if __name__ == '__main__':

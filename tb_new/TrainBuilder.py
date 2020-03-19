@@ -7,6 +7,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 import json
+import socketio
 
 from simulate_webservice import create_json_message
 
@@ -256,6 +257,8 @@ class TrainBuilder:
             return self.hash
         else:
             print("No Hash available yet for the current train")
+            
+
 
 
 if __name__ == '__main__':
