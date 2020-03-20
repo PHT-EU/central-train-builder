@@ -17,9 +17,12 @@ class TrainBuilder:
         # TODO perform docker login into harbour and check connection to vault, provide path to stored secrets
         # TODO maybe use a different class for vault/harbour clients
         # docker login
+        # TODO remove vault url and change vault access
         self.vault_url = vault_url
+        self.vault_token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
         self.hash = None
         self.registry_url = "harbor.lukaszimmermann.dev"
+        self.message = None
 
     def build_train(self, web_service_json, user_signature):
         """
@@ -177,6 +180,14 @@ class TrainBuilder:
                 public_keys[int(key.split("_")[1])] = keys[key].encode()
 
         return public_keys
+
+
+    def get_station_public_key(self, station_id):
+        token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
+        vault_url = f"https://vault.lukaszimmermann.dev/v1/station_pks/{station_id}"
+        headers = {"X-Vault-Token": token}
+        r = requests.get(vault_url, headers=headers)
+        print(r.json()["data"]["rsa_public_key"])
 
     @staticmethod
     def load_public_key(key: bytes):

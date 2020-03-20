@@ -1,6 +1,8 @@
 import json
 import cryptography
 import socketio
+import asyncio
+import os
 
 def create_json_message():
 
@@ -9,11 +11,30 @@ def create_json_message():
     :return:
     """
 
-    with open("/home/michaelgraf/Desktop/train-user-client/rsa_public_key", "rb") as f:
-        user_pk = f.read()
+    #with open("/home/michaelgraf/Desktop/train-user-client/rsa_public_key", "rb") as f:
+    #    user_pk = f.read()
 
     # TODO replace with signature based on hash files created with  the user private key
     user_signature = "user_signature"
+
+    train_files = {}
+    with open("D:\\train-builder\\test_train\\base-test-master\\image_files\\endpoints\\calculate_sum\\commands\\run\\entrypoint.py", "r") as f:
+        train_files["entrypoint_1"] = f.read()
+    with open("D:\\train-builder\\test_train\\base-test-master\\image_files\\endpoints\\calculate_sum\\commands\\run\\README.md", "r") as f:
+        train_files["readme_1"] = f.read()
+    with open("D:\\train-builder\\test_train\\base-test-master\\image_files\\endpoints\\calculate_sum\\commands\\run\\RESOURCES.tsv", "r") as f:
+        train_files["resources_1"] = f.read()
+    with open("D:\\train-builder\\test_train\\base-test-master\\image_files\\endpoints\\calculate_sum\\commands\\run\\QUERY.sql", "r") as f:
+        train_files["query_1"] = f.read()
+    with open("D:\\train-builder\\test_train\\base-test-master\\image_files\\endpoints\\hello_world\\commands\\run\\entrypoint.py", "r") as f:
+        train_files["entrypoint_2"] = f.read()
+    with open("D:\\train-builder\\test_train\\base-test-master\\image_files\\endpoints\\hello_world\\commands\\run\\README.md", "r") as f:
+        train_files["readme_2"] = f.read()
+    with open("D:\\train-builder\\test_train\\base-test-master\\image_files\\endpoints\\hello_world\\commands\\run\\QUERY.sql", "r") as f:
+        train_files["query_2"] = f.read()
+
+
+
 
     message = {
         # String containing USER ID
@@ -21,7 +42,8 @@ def create_json_message():
         # String containing Train ID
         "train_id": "1",
         # String representation of user public key
-        "user_public_key": user_pk.decode(),
+        # TODO move getting user public key to train builder
+        # "user_public_key": user_pk.decode(),
         # Signature created with the offline tool.
         "user_signature": user_signature,
         "route": [1,2,3],
@@ -35,50 +57,50 @@ def create_json_message():
              # List of dictionaries of commands (mostly only run for now)
              "commands": [
                  {"name": "run",
-                  # List of file paths associated with the command
-                  "files": ["/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/calculate_sum"
-                            "/commands/run/entrypoint.py",
-                            "/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/calculate_sum"
-                            "/commands/run/entrypoint.py",
-                            "/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/calculate_sum"
-                            "/commands/run/RESOURCES.tsv"]},
+                  # List of list of files, consisting of filename and string representation of fileobject
+                  "files": [["entrypoint.py", train_files["entrypoint_1"]], ["README.md", train_files["readme_1"]],
+                            ["RESOURCES.tsv", train_files["resources_1"]], ["QUERY.sql", train_files["query_1"]]]}
              ]},
             {"name": "hello_world",
              # List of dictionaries of commands (mostly only run for now)
              "commands": [
                  {"name": "run",
                   # List of file paths associated with the command
-                  "files": ["/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/hello_world/commands"
-                            "/run/entrypoint.py",
-                            "/home/michaelgraf/Desktop/trainTest/base-test/image_files/endpoints/hello_world/commands"
-                            "/run/README.md"]},
+                  "files": [["entrypoint.py", train_files["entrypoint_1"]], ["README.md", train_files["readme_2"]],
+                            ["QUERY.sql", train_files["query_2"]]]}
              ]},
         ],
-        # List of file paths of query files passed to webservice
-        "query_files": ["query1", "query2"],
 
     }
-    return json.dumps(message, indent=4)
+    with open("sample_message.json", "w") as f:
+        json.dump(message, f, indent=2)
+    return json.dumps(message, indent=2)
 
 async def simulate_client():
+
     sio = socketio.AsyncClient()
     @sio.event
     async def connect():
         print("Connection established")
 
     @sio.event
-    def my_message(data):
+    def my_message(sid, data):
         print('message received with ', data)
-        sio.emit('my response', {'response': 'my response'})
+        sio.emit('my_response', {'response': 'my response'})
 
     @sio.event
     def disconnect():
         print('disconnected from server')
 
-    await sio.connect('http://localhost:5000')
+    await sio.connect('http://localhost:8888')
     print('my sid is', sio.sid)
-    sio.wait()
+    await sio.emit("my_message", {"foo": 123565})
+
+    await sio.wait()
+
 
 
 if __name__ == '__main__':
     print(create_json_message())
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(simulate_client())

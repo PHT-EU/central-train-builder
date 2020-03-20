@@ -16,6 +16,13 @@ async def index(request):
     with open('index.html') as f:
         return web.Response(text=f.read(), content_type='text/html')
 
+
+@sio.event
+async def connect(sid, environ):
+    print("connect event called")
+    print(sid)
+    await sio.emit('my_response', {'data': 'Connected', 'count': 0}, room=sid)
+
 # If we wanted to create a new websocket endpoint,
 # use this decorator, passing in the name of the
 # event we wish to listen out for

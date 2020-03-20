@@ -1,0 +1,62 @@
+{
+  "user_id": "123456",
+  "train_id": "1",
+  "user_signature": "user_signature",
+  "route": [
+    1,
+    2,
+    3
+  ],
+  "master_image": "harbor.lukaszimmermann.dev/pht_master/python:3.8.1-alpine3.11",
+  "root_path": "/home/michaelgraf/Desktop/TrainBuilder/train-builder/tb_new",
+  "endpoints": [
+    {
+      "name": "calculate_sum",
+      "commands": [
+        {
+          "name": "run",
+          "files": [
+            [
+              "entrypoint.py",
+              "#!/usr/bin/env python\nimport os\nimport typing\n\n_FILE_PREFIX = 'SUMMAND'\n_RESULT_FILE = 'SUM'\n_RESOURCE_VOLUME_PHT_TEST_VOLUME = 'PHT_RESOURCE_PHT_TEST_VOLUME'\n\n\ndef get_input_dir():\n    return os.environ[_RESOURCE_VOLUME_PHT_TEST_VOLUME]\n\ndef list_dir() -> typing.Iterable[str]:\n    d = get_input_dir()\n    for f in os.listdir(d):\n        if f.startswith(_FILE_PREFIX):\n            yield os.path.join(d, f)\n\ndef number_from_file(filename):\n    with open(filename) as f:\n        return int(f.read())\n\ndef compute_sum():\n    return sum(number_from_file(f) for f in list_dir())\n\nif __name__ == '__main__':\n    s = compute_sum()\n    with open(_RESULT_FILE, 'a') as f:\n        f.write(f'{s}\\n')\n\n"
+            ],
+            [
+              "README.md",
+              "# Calculate Sum\n\n## Description\nCalculates the SUM of the values stored in the files SUMMAND prefixed\nfiles and appends the value in the SUM file\n\n"
+            ],
+            [
+              "RESOURCES.tsv",
+              "PHT_TEST_VOLUME\n"
+            ],
+            [
+              "QUERY.sql",
+              "SELECT * FROM PATIENTS"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hello_world",
+      "commands": [
+        {
+          "name": "run",
+          "files": [
+            [
+              "entrypoint.py",
+              "#!/usr/bin/env python\nimport os\nimport typing\n\n_FILE_PREFIX = 'SUMMAND'\n_RESULT_FILE = 'SUM'\n_RESOURCE_VOLUME_PHT_TEST_VOLUME = 'PHT_RESOURCE_PHT_TEST_VOLUME'\n\n\ndef get_input_dir():\n    return os.environ[_RESOURCE_VOLUME_PHT_TEST_VOLUME]\n\ndef list_dir() -> typing.Iterable[str]:\n    d = get_input_dir()\n    for f in os.listdir(d):\n        if f.startswith(_FILE_PREFIX):\n            yield os.path.join(d, f)\n\ndef number_from_file(filename):\n    with open(filename) as f:\n        return int(f.read())\n\ndef compute_sum():\n    return sum(number_from_file(f) for f in list_dir())\n\nif __name__ == '__main__':\n    s = compute_sum()\n    with open(_RESULT_FILE, 'a') as f:\n        f.write(f'{s}\\n')\n\n"
+            ],
+            [
+              "README.md",
+              "# Hello World\n\n## Description\nPrints Hello World to stdout and exits\n\n\n"
+            ],
+            [
+              "QUERY.sql",
+              "SELECT * FROM PATIENTS"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
