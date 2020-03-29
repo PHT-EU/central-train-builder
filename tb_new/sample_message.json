@@ -1,5 +1,5 @@
 {
-  "user_id": "123456",
+  "user_id": "1",
   "train_id": "1",
   "user_signature": "user_signature",
   "route": [
@@ -7,52 +7,32 @@
     2,
     3
   ],
-  "master_image": "harbor.lukaszimmermann.dev/pht_master/python:3.8.1-alpine3.11",
+  "master_image": "harbor.lukaszimmermann.dev/pht_example_master/master:train",
   "root_path": "/home/michaelgraf/Desktop/TrainBuilder/train-builder/tb_new",
   "endpoints": [
     {
-      "name": "calculate_sum",
+      "name": "encryption",
       "commands": [
         {
           "name": "run",
           "files": [
             [
               "entrypoint.py",
-              "#!/usr/bin/env python\nimport os\nimport typing\n\n_FILE_PREFIX = 'SUMMAND'\n_RESULT_FILE = 'SUM'\n_RESOURCE_VOLUME_PHT_TEST_VOLUME = 'PHT_RESOURCE_PHT_TEST_VOLUME'\n\n\ndef get_input_dir():\n    return os.environ[_RESOURCE_VOLUME_PHT_TEST_VOLUME]\n\ndef list_dir() -> typing.Iterable[str]:\n    d = get_input_dir()\n    for f in os.listdir(d):\n        if f.startswith(_FILE_PREFIX):\n            yield os.path.join(d, f)\n\ndef number_from_file(filename):\n    with open(filename) as f:\n        return int(f.read())\n\ndef compute_sum():\n    return sum(number_from_file(f) for f in list_dir())\n\nif __name__ == '__main__':\n    s = compute_sum()\n    with open(_RESULT_FILE, 'a') as f:\n        f.write(f'{s}\\n')\n\n"
-            ],
-            [
-              "README.md",
-              "# Calculate Sum\n\n## Description\nCalculates the SUM of the values stored in the files SUMMAND prefixed\nfiles and appends the value in the SUM file\n\n"
-            ],
-            [
-              "RESOURCES.tsv",
-              "PHT_TEST_VOLUME\n"
-            ],
-            [
-              "QUERY.sql",
-              "SELECT * FROM PATIENTS"
+              "#!/usr/bin/env python\n\nimport numpy as np\nimport pickle\nimport os\n\n\nclass Train:\n    def __init__(self, model=None):\n        # Model encoded with Pickle\n        self.encoded_model = model\n\n    def _load_model(self):\n        with open(self.encoded_model, 'rb') as model_file:\n            return pickle.load(file=model_file)\n\n    def _save_model(self, model):\n        with open(self.encoded_model, 'wb') as model_file:\n            pickle.dump(model, model_file)\n\n    def run(self):\n        # Generate example 8MB model data -- numpy arrays\n        # If there is no existing model file create it and save the initial data\n\n        if not os.path.isfile(self.encoded_model):\n            model = np.full((1000, 1000), fill_value=1)\n            self._save_model(model)\n            print('Model created and saved at: {}'.format(self.encoded_model))\n        # Otherwise load the existing model file and add the new data to it\n        else:\n            model = self._load_model()\n            model += np.full((1000, 1000), fill_value=1)\n            self._save_model(model)\n            print('Updated model')\n        \n        print('Execution was successful')\n\n\ndef main():\n    train = Train(model='model.pkl')\n    train.run()\n\n\nif __name__ == '__main__':\n    main()\n"
             ]
           ]
         }
       ]
     },
     {
-      "name": "hello_world",
+      "name": "hiv",
       "commands": [
         {
           "name": "run",
           "files": [
             [
               "entrypoint.py",
-              "#!/usr/bin/env python\nimport os\nimport typing\n\n_FILE_PREFIX = 'SUMMAND'\n_RESULT_FILE = 'SUM'\n_RESOURCE_VOLUME_PHT_TEST_VOLUME = 'PHT_RESOURCE_PHT_TEST_VOLUME'\n\n\ndef get_input_dir():\n    return os.environ[_RESOURCE_VOLUME_PHT_TEST_VOLUME]\n\ndef list_dir() -> typing.Iterable[str]:\n    d = get_input_dir()\n    for f in os.listdir(d):\n        if f.startswith(_FILE_PREFIX):\n            yield os.path.join(d, f)\n\ndef number_from_file(filename):\n    with open(filename) as f:\n        return int(f.read())\n\ndef compute_sum():\n    return sum(number_from_file(f) for f in list_dir())\n\nif __name__ == '__main__':\n    s = compute_sum()\n    with open(_RESULT_FILE, 'a') as f:\n        f.write(f'{s}\\n')\n\n"
-            ],
-            [
-              "README.md",
-              "# Hello World\n\n## Description\nPrints Hello World to stdout and exits\n\n\n"
-            ],
-            [
-              "QUERY.sql",
-              "SELECT * FROM PATIENTS"
+              "#!/usr/bin/env python\n\nimport numpy as np\nimport pickle\nfrom sklearn.naive_bayes import MultinomialNB\nfrom sklearn.model_selection import train_test_split\nimport os\n\n_RESIDUES = [\n    'A', 'R', 'N', 'D', 'C', 'E', 'Q', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', '-'\n]\n\n_RESIDUE_ENCODING = {\n    residue:  (index * [0]) + [1] + (len(_RESIDUES) - index - 1) * [0] for index, residue in enumerate(_RESIDUES)\n}\n\n_CXCR4 = 'CXCR4'\n_CCR5 = 'CCR5'\n\ndef _flatten(l):\n    return [item for sublist in l for item in sublist]\n\n\ndef _load_sequences_as_encoded(file_path: str, class_labels):\n    x = []\n    y = []\n\n    feature_space_dimension = None\n    with open(file_path, 'r') as f:\n        for line in f:\n            line = line.strip()\n            if not line:\n                continue\n            line_split = line.split()\n\n            label = _CXCR4 if len(line_split) > 3 else line_split[2].strip()\n            seq = line_split[1].strip()\n            seq_encoded = _flatten(_RESIDUE_ENCODING[residue] for residue in seq)\n            seq_encoded_len = len(seq_encoded)\n\n            if feature_space_dimension is None:\n                feature_space_dimension = seq_encoded_len\n            elif feature_space_dimension != seq_encoded_len:\n                raise ValueError('Inconsistent feature length: {} vs. {}'.format(\n                    feature_space_dimension, seq_encoded_len))\n            x.append(seq_encoded)\n            y.append(class_labels[label])\n    return x, y\n\n\nclass Train:\n    def __init__(self, model=None, data_path=None):\n        # Model encoded with Pickle\n        self.encoded_model = model\n        self.data_path = data_path\n\n    def _load_model(self):\n        with open(self.encoded_model, 'rb') as model_file:\n            return pickle.load(file=model_file)\n\n    def _save_model(self, model):\n        with open(self.encoded_model, 'wb') as model_file:\n            pickle.dump(model, model_file)\n\n    def run(self):\n        # Data Loading and class encoding\n        x, y = _load_sequences_as_encoded(self.data_path, class_labels={\n            _CCR5: 1,\n            _CXCR4: 0\n        })\n\n        x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.10)\n        classes = np.array([0, 1])\n\n        if not os.path.isfile(self.encoded_model):\n            print('Model does not exists - a new model will be trained')\n\n            model = MultinomialNB(alpha=0.01)\n            model.partial_fit(x_train, y_train, classes=classes)\n\n            acc = model.score(x_test, y_test)\n            print('Acc after updating model: {}'.format(acc))\n\n            # Include hold out data in model before leaving station\n            model.partial_fit(x_test, y_test, classes=classes)\n            self._save_model(model)\n\n            print('Model saved at: {}'.format(self.encoded_model))\n        # Otherwise load the existing model file and add the new data to it\n        else:\n            print('Model already exists:')\n            pickle_model = self._load_model()\n\n            acc = pickle_model.score(x_test, y_test)\n            print('Acc on unseen data from new station: {}'.format(acc))\n\n            pickle_model.partial_fit(x_train, y_train, classes=classes)\n\n            new_acc = pickle_model.score(x_test, y_test)\n            print('Acc after updating model at new station: {}'.format(new_acc))\n\n            # Include hold out data in model before leaving station\n            pickle_model.partial_fit(x_test, y_test, classes=classes)\n\n            self._save_model(model=pickle_model)\n            print('Updated model')\n\n        print('Execution was successful')\n\n\ndef main():\n    train = Train(model='model.pkl', data_path='/data/sequence.txt')\n    train.run()\n\n\nif __name__ == '__main__':\n    main()\n\n"
             ]
           ]
         }

@@ -4,6 +4,8 @@ from cryptography.hazmat.primitives import serialization
 import os
 import requests
 import json
+import docker
+import tempfile
 
 
 def generate_rsa_key_pair(dir, id):
@@ -70,8 +72,12 @@ hQIDAQAB
    r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
    print(r)
 
-
+import io
 if __name__ == '__main__':
     # generate_rsa_key_pair("D:\\train-builder\\keys", "user_3")
-    query_vault(2)
-    post_vault_key(3)
+    # query_vault(2)
+    # post_vault_key(3)
+    client = docker.from_env()
+    logs = client.images.build(path=os.getcwd())
+    print(logs)
+

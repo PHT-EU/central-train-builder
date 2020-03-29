@@ -1,5 +1,5 @@
 cryptography
-docker-py
+docker
 requests
 python-socketio
 aiohttp

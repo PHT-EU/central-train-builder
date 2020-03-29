@@ -7,81 +7,75 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 import json
-import socketio
-
+from base64 import b64encode
 from simulate_webservice import create_json_message
+import tempfile
+import shutil
 
 
 class TrainBuilder:
     def __init__(self, vault_url):
-        # TODO perform docker login into harbour and check connection to vault, provide path to stored secrets
-        # TODO maybe use a different class for vault/harbour clients
         # docker login
         # TODO remove vault url and change vault access
         self.vault_url = vault_url
         self.vault_token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
         self.hash = None
         self.registry_url = "harbor.lukaszimmermann.dev"
-        self.message = None
+        self.session_id = None
 
-    def build_train(self, web_service_json, user_signature):
+    def build_train(self, web_service_json):
         """
         :param web_service_json: The message received from the
         :return: docker image of the final train
         """
-        # TODO build docker image based on given values
 
         # Generate random number for session id, is this the right place?
         session_id = os.urandom(64)
-        hash = self.provide_hash(web_service_json, session_id)
-        # # TODO how communicate with the central service here ( async communication)
-        # TODO need to wait for user to provide the signed hash before creating the keyfile etc
         # # encrypt the query files before adding them to the image
         session_key = Fernet.generate_key()
 
         message = json.loads(web_service_json)
 
+        train_hash = self.provide_hash(message)
+
         fernet = Fernet(session_key)
-        for file in message["query_files"]:
-            self.encrypt_file(fernet, file)
+        # for file in message["query_files"]:
+        #    self.encrypt_file(fernet, file)
 
         # create keyfile and store it in pickled form
-        self.create_key_file(message["user_id"], message["user_public_key"],
-                             message["user_signature"], session_key, message["route"], message["train_id"])
+        self.create_train_config(message["user_id"], self.get_user_public_key(message["user_id"]),
+                                 message["user_signature"], session_key, message["route"], message["train_id"])
         client = docker.client.from_env()
-        self.create_temp_dockerfile(message, "KeyFile")
-        image = client.images.build(path=".", tag=message["train_id"])
-        # Remove KeyFile after image has been built successfully
-        os.remove("KeyFile")
-        # TODO also remove other files
-        self.push_train(message["train_id"], client, message["route"][0])
 
+        # login to the registry
+        login_result = client.login(username="migraf", password="Eufnayg1!", registry=self.registry_url)
+        print(login_result)
+        self.create_temp_dockerfile(message, "train_config.json")
+        image, logs = client.images.build(path=os.getcwd())
+        print(logs)
+        image.tag("harbor.lukaszimmermann.dev/pht_incoming/incoming", tag=message["train_id"])
+        # Remove files after image has been built successfully
+        os.remove("train_config.json")
+        shutil.rmtree("pht_train")
+        result = client.images.push(repository="harbor.lukaszimmermann.dev/pht_incoming/incoming",
+                                    tag=message["train_id"])
+        print(result)
         # TODO remove image after pushing successfully
-
         return image
 
-    def provide_hash(self, web_service_json, session_id):
+    def provide_hash(self, web_service_json):
         """
         Calculates the hash based on the user provided files and returns it for signing by the user
         :param web_service_json:
         :return:
         """
+        session_id = self._generate_session_id()
+        self.session_id = session_id
         files = self._get_files(web_service_json)
         self.generate_hash(web_service_json["user_id"], files, web_service_json["route"], session_id)
         return self.hash
 
-    def push_train(self, tag, client, first_station):
-        # TODO load registry auth stuff from dockerconfig?
-        try:
-            client.login("username", "password", "email", self.registry_url, reauth=True)
-        except docker.errors.APIError:
-            print("Something went wrong logging in, check docker config etc")
-            # TODO sensibly handle error
-
-        # TODO check if this works
-        client.images.push(repository="harbor.likaszimmermann.dev" + "/" + first_station, tag=tag)
-
-    def create_temp_dockerfile(self, web_service_json, key_file_path):
+    def create_temp_dockerfile(self, web_service_json, train_config):
         """
         Creates a dockerfile to build a train image
         :param endpoints: Dictionary created from message from webservice containing  all files defining the file
@@ -90,10 +84,9 @@ class TrainBuilder:
         """
         with open("Dockerfile", "w") as f:
             f.write("FROM " + web_service_json["master_image"] + "\n")
-            file_paths = self._generate_file_paths(web_service_json)
-            for file in file_paths:
-                f.write("COPY " + file[0] + " " + file[1] + "\n")
-            f.write("COPY " + key_file_path + " " + os.path.join("/opt/pht_train/", "KeyFile"))
+            self.generate_pht_dir(web_service_json)
+            f.write("COPY pht_train /opt/pht_train\n")
+            f.write("COPY " + train_config + " " + "/opt/pht_train/train_config.json" + "\n")
 
     @staticmethod
     def encrypt_file(fernet: Fernet, file):
@@ -108,7 +101,7 @@ class TrainBuilder:
         with open(file, "wb") as f:
             f.write(encrypted_file)
 
-    def create_key_file(self, user_id: str, user_pk: str, user_signature, session_key, route, train_id):
+    def create_train_config(self, user_id: str, user_pk: str, user_signature, session_key, route, train_id):
         """
         Creates a keyfile given the values provided by the webservice and stores it in the current working  directory
         :param user_id: id of the user creating the train
@@ -117,23 +110,23 @@ class TrainBuilder:
         :return:
         """
         encrypted_session_key = self.encrypt_session_key(session_key, route)
-        station_public_keys = self.get_station_public_keys(self.vault_url, route)
+        station_public_keys = self.get_station_public_keys(route)
         keys = {
             "user_id": user_id,
             "train_id": train_id,
-            "session_id": os.urandom(64),
-            "rsa_user_public_key": user_pk.encode(),
+            "session_id": b64encode(os.urandom(64)).decode(),
+            "rsa_user_public_key": user_pk,
             "encrypted_key": encrypted_session_key,
             "rsa_public_keys": station_public_keys,
-            "e_h": self.hash,
+            "e_h": b64encode(self.hash).decode(),
             "e_h_sig": user_signature,
             "e_d": None,
             "e_d_sig": None,
             "digital_signature": None
 
         }
-        with open("KeyFile", "wb") as kf:
-            pickle.dump(keys, kf)
+        with open("train_config.json", "w") as kf:
+            json.dump(keys, kf)
 
     def encrypt_session_key(self, session_key, route):
         """
@@ -142,52 +135,59 @@ class TrainBuilder:
         :param route:
         :return:
         """
-        station_public_keys = self.get_station_public_keys(self.vault_url, route)
-        encrpyted_session_key = {}
-        for id, key in station_public_keys.items():
-            pk = self.load_public_key(key)
+        station_public_keys = self.get_station_public_keys(route)
+        encrypted_session_key = {}
+        for idx, key in station_public_keys.items():
+            pk = self.load_public_key(key.encode())
             encrypted_key = pk.encrypt(session_key,
                                        padding.OAEP(
                                            mgf=padding.MGF1(algorithm=hashes.SHA512()),
                                            algorithm=hashes.SHA512(),
                                            label=None
                                        ))
-            encrpyted_session_key[id] = encrypted_key
+            encrypted_session_key[idx] = b64encode(encrypted_key).decode()
 
-        return encrpyted_session_key
+        return encrypted_session_key
 
     def upload_user_public_key(self, user_pk):
         # TODO upload the provided user pk to vault?
         # TODO is this really necessary??? Maybe doesnt need to be stored
         pass
 
-    @staticmethod
-    def get_station_public_keys(vault_url: str, route: list):
+    def get_station_public_keys(self, route: list):
         """
         Gets the public keys of the stations included in the route from the vault service
-        :param vault_url: location of key storage
         :param route: route containing PID of stations
         :return: dictionary with statino PIDs as keys and the associated public keys as values
         """
-        # TODO replace with secure token
-        vault_token = ""
-        headers = {"X-Vault-Token": vault_token}
-        r = requests.get(vault_url, headers=headers)
-        keys: dict = r.json()["data"]
         public_keys = {}
-        for key in keys:
-            if int(key.split("_")[1]) in route:
-                public_keys[int(key.split("_")[1])] = keys[key].encode()
-
+        for station in route:
+            public_keys[station] = self.get_station_public_key(station)
         return public_keys
 
-
     def get_station_public_key(self, station_id):
+        """
+        Get
+        :param station_id:
+        :type station_id:
+        :return:
+        :rtype:
+        """
+        # TODO change to use self vault url and hide token
         token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
         vault_url = f"https://vault.lukaszimmermann.dev/v1/station_pks/{station_id}"
         headers = {"X-Vault-Token": token}
         r = requests.get(vault_url, headers=headers)
-        print(r.json()["data"]["rsa_public_key"])
+        data = r.json()["data"]
+        return data['data']["rsa_public_key"]
+
+    def get_user_public_key(self, user_id):
+        token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
+        vault_url = f"https://vault.lukaszimmermann.dev/v1/user_pks/{user_id}"
+        headers = {"X-Vault-Token": token}
+        r = requests.get(vault_url, headers=headers)
+        data = r.json()["data"]
+        return data['data']["rsa_public_key"]
 
     @staticmethod
     def load_public_key(key: bytes):
@@ -200,6 +200,10 @@ class TrainBuilder:
         return public_key
 
     @staticmethod
+    def _generate_session_id():
+        return os.urandom(64)
+
+    @staticmethod
     def _get_files(message):
         """
         Gets the paths (on the server) of all specified files
@@ -207,36 +211,35 @@ class TrainBuilder:
         :return: list of file paths of relevant files
         """
         files = []
-        for endpoint in message["enpoints"]:
+        for endpoint in message["endpoints"]:
             for command in endpoint["commands"]:
                 for f in command["files"]:
-                    files.append(f)
-        files.append(message["query_files"])
+                    files.append(f[1])
 
         return files
 
-
     @staticmethod
-    def _generate_file_paths(message):
+    def generate_pht_dir(message):
         """
         Parses the message received from the webservice and  returns  a list of all files to be hashed
         :param message:
         :return: list of files to be hashed
         """
-        files = []
-        query_prefix = "/opt/pht_train/executions/_currently_running/_working"
-        endpoint_prefix = "/opt/pht_train/endpoints"
+        os.mkdir("pht_train")
+        path = "pht_train"
         for endpoint in message["endpoints"]:
-            path = os.path.join(endpoint_prefix, endpoint["name"])
+            endpoint_path = os.path.join(path, endpoint["name"])
+            os.mkdir(endpoint_path)
             for command in endpoint["commands"]:
-                path = os.path.join(path, command["name"])
+                command_path = os.path.join(endpoint_path, command["name"])
+                os.mkdir(command_path)
                 for file in command["files"]:
-                    file_path = os.path.join(path, file)
-                    files.append((file, file_path))
+                    file_path = os.path.join(command_path, file[0])
+                    with open(file_path, "w") as f:
+                        f.write(file[1])
 
-        for query_file in message["query_files"]:
-            files.append((query_file, os.path.join(query_prefix, query_file)))
-        return files
+        # for query_file in message["query_files"]:
+        #    files.append((query_file, os.path.join(query_prefix, query_file)))
 
     def generate_hash(self, user_id, files, route, session_id):
         """
@@ -260,26 +263,23 @@ class TrainBuilder:
     @staticmethod
     def hash_files(hasher: hashes.Hash, files: list):
         for file in files:
-            with open(file, "rb") as f:
-                hasher.update(f.read())
+            hasher.update(file.encode())
 
     def _get_hash(self):
         if self.hash is not None:
             return self.hash
         else:
             print("No Hash available yet for the current train")
-            
-
 
 
 if __name__ == '__main__':
     tb = TrainBuilder("https://vault.lukaszimmermann.dev/v1/cubbyhole/station_public_keys")
-    # keys = tb.get_station_public_keys("https://vault.lukaszimmermann.dev/v1/cubbyhole/station_public_keys", [1, 2, 3])
+    # keys = tb.get_station_public_keys([1, 2, 3])
     sym_key = Fernet.generate_key()
     route = [1, 2, 3]
     print(tb.encrypt_session_key(sym_key, route))
     json_message = create_json_message()
     tb.build_train(json_message)
-
+    # tb.generate_pht_dir(json.loads(json_message))
     # keys = tb.create_key_file("123456", )
     # tb._save_key_file(keys)
