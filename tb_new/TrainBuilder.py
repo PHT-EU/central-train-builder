@@ -18,7 +18,7 @@ class TrainBuilder:
         # docker login
         # TODO remove vault url and change vault access
         self.vault_url = vault_url
-        self.vault_token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
+        self.vault_token = ""
         self.hash = None
         self.registry_url = "harbor.lukaszimmermann.dev"
         self.session_id = None
