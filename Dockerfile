@@ -1,3 +1,3 @@
-FROM harbor.lukaszimmermann.dev/pht_master/python:3.8.1-alpine3.11
-
-RUN mkdir /opt/pht_train/entrypoints
+FROM harbor.lukaszimmermann.dev/pht_example_master/master:train
+COPY pht_train /opt/pht_train
+COPY train_config.json /opt/pht_train/train_config.json

@@ -86,6 +86,10 @@ async def simulate_client():
     async def built_train(data):
         print("Train successfully built")
 
+    @sio.on("build_failure")
+    async def print_error(data):
+        print(data)
+
     @sio.event
     def disconnect():
         print('disconnected from server')

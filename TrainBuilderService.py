@@ -1,7 +1,8 @@
 import socketio
 from aiohttp import web
-from tb_new.TrainBuilder import TrainBuilder
+from TrainBuilder import TrainBuilder
 import json
+import shutil
 
 
 sio = socketio.AsyncServer()
@@ -10,7 +11,7 @@ app = web.Application()
 
 sio.attach(app)
 
-tb = TrainBuilder("https://vault.lukaszimmermann.dev/v1//station_public_keys")
+tb = TrainBuilder("https://vault.lukaszimmermann.dev/v1/station_public_keys")
 
 # we can define aiohttp endpoints just as we normally
 # would with no change
@@ -40,8 +41,6 @@ async def print_message(sid, message):
 @sio.on("generate_hash")
 async def generate_hash(sid, message):
     json_message = json.JSONDecoder().decode(message)
-
-    print(json_message)
     print("Generating Hash")
     hashed_value = tb.provide_hash(json_message)
     print(hashed_value)
@@ -54,9 +53,12 @@ async def build_train(sid, message):
     print("Building Train")
     try:
         tb.build_train(message)
+
         await sio.emit("built_train", data={"completed": True})
     except BaseException as e:
-        await sio.emit("build_failure", data={"failed": e})
+        shutil.rmtree("pht_train")
+        print(e)
+        await sio.emit("build_failure", data={"failed": str(e)})
 
 # We bind our aiohttp endpoint to our app
 # router

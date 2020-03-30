@@ -1,5 +1,3 @@
 cryptography
 docker
 requests
-python-socketio
-aiohttp

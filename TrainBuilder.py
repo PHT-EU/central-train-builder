@@ -18,7 +18,7 @@ class TrainBuilder:
         # docker login
         # TODO remove vault url and change vault access
         self.vault_url = vault_url
-        self.vault_token = ""
+        self.vault_token = os.getenv("VAULT_TOKEN")
         self.hash = None
         self.registry_url = "harbor.lukaszimmermann.dev"
         self.session_id = None
@@ -48,17 +48,17 @@ class TrainBuilder:
         client = docker.client.from_env()
 
         # login to the registry
-        login_result = client.login(username="migraf", password="Eufnayg1!", registry=self.registry_url)
-        print(login_result)
+        login_result = client.login(username=os.getenv("TB_HARBOR_USER"), password=os.getenv("TB_HARBOR_PW"),
+                                    registry=self.registry_url)
         self.create_temp_dockerfile(message, "train_config.json")
         image, logs = client.images.build(path=os.getcwd())
-        print(logs)
-        image.tag("harbor.lukaszimmermann.dev/pht_incoming/incoming", tag=message["train_id"])
+        repo = f"harbor.lukaszimmermann.dev/pht_incoming/{message['train_id']}"
+        image.tag(repo, tag="quick")
         # Remove files after image has been built successfully
         os.remove("train_config.json")
         shutil.rmtree("pht_train")
-        result = client.images.push(repository="harbor.lukaszimmermann.dev/pht_incoming/incoming",
-                                    tag=message["train_id"])
+        result = client.images.push(repository=repo,
+                                    tag="quick")
         print(result)
         # TODO remove image after pushing successfully
         return image
