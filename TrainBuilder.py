@@ -30,7 +30,7 @@ class TrainBuilder:
         """
 
         # Generate random number for session id, is this the right place?
-        session_id = os.urandom(64)
+        # session_id = os.urandom(64)
         # # encrypt the query files before adding them to the image
         session_key = Fernet.generate_key()
 
@@ -38,11 +38,9 @@ class TrainBuilder:
 
         train_hash = self.provide_hash(message)
 
-        fernet = Fernet(session_key)
-        # for file in message["query_files"]:
-        #    self.encrypt_file(fernet, file)
+        # fernet = Fernet(session_key)
 
-        # create keyfile and store it in pickled form
+        # create trainconfig and store it in pickled form
         self.create_train_config(message["user_id"], self.get_user_public_key(message["user_id"]),
                                  message["user_signature"], session_key, message["route"], message["train_id"])
         client = docker.client.from_env()
@@ -149,11 +147,6 @@ class TrainBuilder:
 
         return encrypted_session_key
 
-    def upload_user_public_key(self, user_pk):
-        # TODO upload the provided user pk to vault?
-        # TODO is this really necessary??? Maybe doesnt need to be stored
-        pass
-
     def get_station_public_keys(self, route: list):
         """
         Gets the public keys of the stations included in the route from the vault service
@@ -173,10 +166,8 @@ class TrainBuilder:
         :return:
         :rtype:
         """
-        # TODO change to use self vault url and hide token
-        token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
         vault_url = f"https://vault.lukaszimmermann.dev/v1/station_pks/{station_id}"
-        headers = {"X-Vault-Token": token}
+        headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
         data = r.json()["data"]
         return data['data']["rsa_public_key"]
