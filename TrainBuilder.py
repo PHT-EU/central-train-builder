@@ -121,7 +121,6 @@ class TrainBuilder:
             "e_d": None,
             "e_d_sig": None,
             "digital_signature": None
-
         }
         with open("train_config.json", "w") as kf:
             json.dump(keys, kf)
