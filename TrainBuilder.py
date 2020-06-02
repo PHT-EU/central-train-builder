@@ -11,16 +11,21 @@ from base64 import b64encode
 from simulate_webservice import create_json_message
 import tempfile
 import shutil
+from dotenv import load_dotenv
+from pathlib import Path
 
 
 class TrainBuilder:
     def __init__(self, vault_url):
         # docker login
         # TODO remove vault url and change vault access
+        env_path = Path('.') / '.env'
+        load_dotenv(dotenv_path=env_path)
         self.vault_url = vault_url
-        self.vault_token = os.getenv("VAULT_TOKEN")
+        self.vault_token = os.getenv("vault_token")
+        print(self.vault_token)
         self.hash = None
-        self.registry_url = "harbor.lukaszimmermann.dev"
+        self.registry_url = "https://harbor.pht.medic.uni-tuebingen.de"
         self.session_id = None
 
     def build_train(self, web_service_json):
@@ -46,11 +51,17 @@ class TrainBuilder:
         client = docker.client.from_env()
 
         # login to the registry
-        login_result = client.login(username=os.getenv("TB_HARBOR_USER"), password=os.getenv("TB_HARBOR_PW"),
+        # login_result = client.login(username=os.getenv("TB_HARBOR_USER"), password=os.getenv("TB_HARBOR_PW"),
+        #                             registry=self.registry_url)
+        env_path = Path('.') / '.env'
+        load_dotenv(dotenv_path=env_path)
+        print(os.getenv("harbor_user"))
+        print(os.getenv("harbor_user"))
+        login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                     registry=self.registry_url)
         self.create_temp_dockerfile(message, "train_config.json")
         image, logs = client.images.build(path=os.getcwd())
-        repo = f"harbor.lukaszimmermann.dev/pht_incoming/{message['train_id']}"
+        repo = f"harbor.pht.medic.uni-tuebingen.de/pht_incoming/{message['train_id']}"
         image.tag(repo, tag="quick")
         # Remove files after image has been built successfully
         os.remove("train_config.json")
@@ -165,19 +176,18 @@ class TrainBuilder:
         :return:
         :rtype:
         """
-        vault_url = f"https://vault.lukaszimmermann.dev/v1/station_pks/{station_id}"
+        vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/station_pks/{station_id}"
         headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
         data = r.json()["data"]
-        return data['data']["rsa_public_key"]
+        return data["data"]["rsa_public_key"]
 
     def get_user_public_key(self, user_id):
-        token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
-        vault_url = f"https://vault.lukaszimmermann.dev/v1/user_pks/{user_id}"
-        headers = {"X-Vault-Token": token}
+        vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/user_pks/{user_id}"
+        headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
         data = r.json()["data"]
-        return data['data']["rsa_public_key"]
+        return data["data"]["rsa_public_key"]
 
     @staticmethod
     def load_public_key(key: bytes):

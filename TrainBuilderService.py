@@ -11,7 +11,7 @@ app = web.Application()
 
 sio.attach(app)
 
-tb = TrainBuilder("https://vault.lukaszimmermann.dev/v1/station_public_keys")
+tb = TrainBuilder("https://vault.pht.medic.uni-tuebingen.de/")
 
 # we can define aiohttp endpoints just as we normally
 # would with no change
