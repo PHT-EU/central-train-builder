@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -6,6 +8,7 @@ import requests
 import json
 import docker
 import tempfile
+from dotenv import load_dotenv
 
 
 def generate_rsa_key_pair(dir, id):
@@ -32,7 +35,7 @@ def generate_rsa_key_pair(dir, id):
 
 
 def query_vault(user_id):
-    token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
+    token = os.getenv("vault_token")
     vault_url = f"https://vault.lukaszimmermann.dev/v1/station_pks/{user_id}"
     headers = {"X-Vault-Token": token}
     r = requests.get(vault_url, headers=headers)
@@ -47,37 +50,32 @@ def post_vault_key(user_id):
     https://127.0.0.1:8200/v1/secret/data/user_pks/3
    """
 
-   token = "s.jmMOV4W43R2zQ2WOuSQMwsV9"
-   vault_url = f"https://vault.lukaszimmermann.dev/v1/station_pks/{user_id}"
+   token = os.getenv("vault_token")
+   vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/kv-pht-routes/data/test"
    headers = {"X-Vault-Token": token}
-   pk = """-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0x7Fp8EyRbLQfhP1qtdL
-rQqVtEaaChTlQLhcZM+drO0Xpf3oj7F1gb9VmTe9WIhY2NB2x9r5s41eiMPYpxHA
-TJ6a0ba4mNT4pCX+RMWb6OPUqdLc6AHG2E1vhiwkXkQVdpBIRrzWJbyOmI6Sra1H
-/Sny/6hTdS1YiJy0PUYpPUfPxbhGNPewebFRSNr/Dsx8OpKt1mZB/kXxDRZw/TIz
-B0PYcokxqeHwqY00K7bgXNxbLr5REWUuqZhhbmtA6/z5wNXkWhdnvE6dyqFS4CQU
-ttb1L3dWFTxbi6CqCaWcGYWC0/0jKOMpc1wfyYMw2h1wgGfCG1x6Ibq9Pre6gpQx
-hQIDAQAB
------END PUBLIC KEY-----
-"""
 
    payload = {
        "options": {
            "cas": 0
        },
        "data":{
-           "rsa_public_key" : pk,
+           "test_route" : {
+               "harborProjects": ["tuebingen", "leipzig"],
+               "repositorySuffix": "busybox"
+           },
        }
    }
    r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
-   print(r)
+   print(r.json())
 
 import io
 if __name__ == '__main__':
+    env_path = Path('.') / '.env'
+    load_dotenv(dotenv_path=env_path)
     # generate_rsa_key_pair("D:\\train-builder\\keys", "user_3")
     # query_vault(2)
-    # post_vault_key(3)
-    client = docker.from_env()
-    logs = client.images.build(path=os.getcwd())
-    print(logs)
+    post_vault_key(3)
+    # client = docker.from_env()
+    # logs = client.images.build(path=os.getcwd())
+    # print(logs)
 
