@@ -134,7 +134,7 @@ class TrainBuilder:
             "digital_signature": None
         }
         with open("train_config.json", "w") as kf:
-            json.dump(keys, kf)
+            json.dump(keys, kf, indent=2)
 
     def encrypt_session_key(self, session_key, route):
         """
@@ -183,9 +183,11 @@ class TrainBuilder:
         return data["data"]["rsa_public_key"]
 
     def get_user_public_key(self, user_id):
+        token = os.getenv("vault_token")
         vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/user_pks/{user_id}"
-        headers = {"X-Vault-Token": self.vault_token}
+        headers = {"X-Vault-Token": token}
         r = requests.get(vault_url, headers=headers)
+        print(r.json())
         data = r.json()["data"]
         return data["data"]["rsa_public_key"]
 

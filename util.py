@@ -36,7 +36,7 @@ def generate_rsa_key_pair(dir, id):
 
 def query_vault(user_id):
     token = os.getenv("vault_token")
-    vault_url = f"https://vault.lukaszimmermann.dev/v1/station_pks/{user_id}"
+    vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/user_pks/{user_id}"
     headers = {"X-Vault-Token": token}
     r = requests.get(vault_url, headers=headers)
     print(r.json())
@@ -73,8 +73,8 @@ if __name__ == '__main__':
     env_path = Path('.') / '.env'
     load_dotenv(dotenv_path=env_path)
     # generate_rsa_key_pair("D:\\train-builder\\keys", "user_3")
-    # query_vault(2)
-    post_vault_key(3)
+    query_vault(2)
+    #post_vault_key(3)
     # client = docker.from_env()
     # logs = client.images.build(path=os.getcwd())
     # print(logs)
