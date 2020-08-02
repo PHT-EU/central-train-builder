@@ -42,40 +42,38 @@ def query_vault(user_id):
     print(r.json())
 
 
-
-def post_vault_key(user_id):
-   """--header "X-Vault-Token: ..." \
+def post_route_to_vault(name, route):
+    """--header "X-Vault-Token: ..." \
     --request POST \
     --data @payload.json \
     https://127.0.0.1:8200/v1/secret/data/user_pks/3
    """
 
-   token = os.getenv("vault_token")
-   vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/kv-pht-routes/data/test"
-   headers = {"X-Vault-Token": token}
+    token = os.getenv("vault_token")
+    vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/kv-pht-routes/data/{name}"
+    headers = {"X-Vault-Token": token}
 
-   payload = {
-       "options": {
-           "cas": 0
-       },
-       "data":{
-           "test_route" : {
-               "harborProjects": ["tuebingen", "leipzig"],
-               "repositorySuffix": "busybox"
-           },
-       }
-   }
-   r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
-   print(r.json())
+    payload = {
+        "options": {
+            "cas": 0
+        },
+        "data": {
+            "minimal_route": {
+                "harborProjects": route,
+                "repositorySuffix": "busybox"
+            },
+        }
+    }
+    r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
+    print(r.json())
 
-import io
+
 if __name__ == '__main__':
     env_path = Path('.') / '.env'
     load_dotenv(dotenv_path=env_path)
     # generate_rsa_key_pair("D:\\train-builder\\keys", "user_3")
     query_vault(2)
-    #post_vault_key(3)
+    # post_vault_key(3)
     # client = docker.from_env()
     # logs = client.images.build(path=os.getcwd())
     # print(logs)
-

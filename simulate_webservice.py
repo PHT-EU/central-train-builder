@@ -34,7 +34,7 @@ def create_json_message():
         "user_signature": user_signature,
         "route": [1,2,3],
         # specify which of the provided master images to use
-        "master_image": "harbor.pht.medic.uni-tuebingen.de/pht_master/python_train@sha256:8117e37f7babfc42f7c0566f040d3c47be96541866a53fee86409cfa54a4f035",
+        "master_image": "harbor.pht.medic.uni-tuebingen.de/pht_master/python_train:master",
         # Path where all the files including the generated dockerfile will be stored
         "root_path": "/home/michaelgraf/Desktop/TrainBuilder/train-builder/tb_new",
         # Arbitrary length list of dictionaries of endpoints contained in train image
@@ -66,7 +66,6 @@ def create_json_message():
 
 
 async def simulate_client():
-
     sio = socketio.AsyncClient()
     @sio.event
     async def connect():

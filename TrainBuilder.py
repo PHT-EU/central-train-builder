@@ -56,7 +56,6 @@ class TrainBuilder:
         env_path = Path('.') / '.env'
         load_dotenv(dotenv_path=env_path)
         print(os.getenv("harbor_user"))
-        print(os.getenv("harbor_user"))
         login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                     registry=self.registry_url)
         self.create_temp_dockerfile(message, "train_config.json")
@@ -71,6 +70,23 @@ class TrainBuilder:
         print(result)
         # TODO remove image after pushing successfully
         return image
+
+    def build_minimal_example(self, name, file_path,
+                              master_image="harbor.pht.medic.uni-tuebingen.de/pht_master/python_train:master"):
+        with open("Dockerfile", "w") as f:
+            f.write("FROM " + master_image + "\n")
+            f.write(f"COPY {file_path} /opt/pht_train/entrypoint.py\n")
+            f.write('CMD ["python", /opt/pht_train/entrypoint.py]')
+        client = docker.client.from_env()
+        login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
+                                    registry=self.registry_url)
+        repo = f"harbor.pht.medic.uni-tuebingen.de/pht_incoming/{name}"
+        image, logs = client.images.build(path=os.getcwd())
+        image.tag(repo, tag="minimal")
+        os.remove("Dockerfile")
+        result = client.images.push(repository=repo)
+        print(result)
+
 
     def provide_hash(self, web_service_json):
         """
