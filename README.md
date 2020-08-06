@@ -4,7 +4,7 @@ adding these images to the pht/incoming harbor project and adding the associated
 
 ## Installation
 This package requires docker to be installed on the host machine.  
-The required python packages can be installed via  `pip install -r requirements.txt`
+The required python 3 packages can be installed via  `pip install -r requirements.txt`
 
 ## Configuration/Authentification
 To access harbor and vault, username and password or an authentification token are respectively required. These are read
