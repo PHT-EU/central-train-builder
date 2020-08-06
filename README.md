@@ -27,9 +27,9 @@ This will build a docker image that, once run will execute `python entrypoint.py
 To run the train builder as a asynchronous webservice using socket-io
 use the command: `python TrainBuilderService.py`  
 This will run a socket-io server listening for events under `127.0.0.1:7777`. This service is currently processing two
-types of requests.
+types of events:
 1. **generate_hash**: which processes a message of the type defined in the sample_message.json file and generate a hash
 for the user to sign
-2. **build_train**: processes the same request but this time including the user signed signature of the provided hash,
+2. **build_train**: processes the same message but this time including the user signed signature of the provided hash,
 this will create the train_config.json (example under same name) containing relevant security information, build the
 docker image, post the route to vault and upload the docker image to harbor
