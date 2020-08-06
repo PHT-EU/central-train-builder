@@ -23,7 +23,6 @@ class TrainBuilder:
         load_dotenv(dotenv_path=env_path)
         self.vault_url = vault_url
         self.vault_token = os.getenv("vault_token")
-        print(self.vault_token)
         self.hash = None
         self.registry_url = "https://harbor.pht.medic.uni-tuebingen.de"
         self.session_id = None

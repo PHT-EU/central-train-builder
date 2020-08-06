@@ -39,7 +39,7 @@ def query_vault(user_id):
     vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/user_pks/{user_id}"
     headers = {"X-Vault-Token": token}
     r = requests.get(vault_url, headers=headers)
-    print(r.json())
+    print(json.dumps(r.json(), indent=2))
 
 
 def post_route_to_vault(name, route):
