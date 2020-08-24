@@ -36,7 +36,8 @@ def generate_rsa_key_pair(dir, id):
 
 def query_vault(user_id):
     token = os.getenv("vault_token")
-    vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/user_pks/{user_id}"
+    url = os.getenv("vault_url")
+    vault_url = f"{url}/user_pks/{user_id}"
     headers = {"X-Vault-Token": token}
     r = requests.get(vault_url, headers=headers)
     print(json.dumps(r.json(), indent=2))
@@ -50,7 +51,8 @@ def post_route_to_vault(name, route):
    """
 
     token = os.getenv("vault_token")
-    vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/kv-pht-routes/data/{name}"
+    url = os.getenv("vault_url")
+    vault_url = f"{url}/kv-pht-routes/data/{name}"
     headers = {"X-Vault-Token": token}
 
     payload = {
@@ -64,8 +66,13 @@ def post_route_to_vault(name, route):
             },
         }
     }
-    r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
-    print(r.json())
+    try:
+        # TODO catch update of same route
+        r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
+        print(r.json())
+    except Exception as e:
+        print(e)
+
 
 
 if __name__ == '__main__':

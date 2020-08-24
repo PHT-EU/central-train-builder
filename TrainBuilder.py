@@ -16,15 +16,14 @@ from pathlib import Path
 
 
 class TrainBuilder:
-    def __init__(self, vault_url):
+    def __init__(self):
         # docker login
-        # TODO remove vault url and change vault access
         env_path = Path('.') / '.env'
-        load_dotenv(dotenv_path=env_path)
-        self.vault_url = vault_url
+        load_dotenv(env_path)
+        self.vault_url = os.getenv("vault_url")
         self.vault_token = os.getenv("vault_token")
         self.hash = None
-        self.registry_url = "https://harbor.pht.medic.uni-tuebingen.de"
+        self.registry_url = os.getenv("harbor_url")
         self.session_id = None
 
     def build_train(self, web_service_json):
@@ -47,16 +46,20 @@ class TrainBuilder:
         # create trainconfig and store it in pickled form
         self.create_train_config(message["user_id"], self.get_user_public_key(message["user_id"]),
                                  message["user_signature"], session_key, message["route"], message["train_id"])
-        client = docker.client.from_env()
 
         # login to the registry
-        # login_result = client.login(username=os.getenv("TB_HARBOR_USER"), password=os.getenv("TB_HARBOR_PW"),
-        #                             registry=self.registry_url)
+        client = docker.client.from_env()
         env_path = Path('.') / '.env'
         load_dotenv(dotenv_path=env_path)
         print(os.getenv("harbor_user"))
-        login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
-                                    registry=self.registry_url)
+
+        try:
+            login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
+                                        registry=self.registry_url)
+            print(login_result)
+        except Exception as e:
+            print(e)
+
         self.create_temp_dockerfile(message, "train_config.json")
         image, logs = client.images.build(path=os.getcwd())
         repo = f"harbor.pht.medic.uni-tuebingen.de/pht_incoming/{message['train_id']}"
@@ -77,15 +80,19 @@ class TrainBuilder:
             f.write(f"COPY {file_path} /opt/pht_train/entrypoint.py\n")
             f.write('CMD ["python", /opt/pht_train/entrypoint.py]')
         client = docker.client.from_env()
-        login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
-                                    registry=self.registry_url)
+        try:
+            login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
+                                        registry=self.registry_url)
+            print(login_result)
+        except Exception as e:
+            print(e)
+            exit(0)
         repo = f"harbor.pht.medic.uni-tuebingen.de/pht_incoming/{name}"
         image, logs = client.images.build(path=os.getcwd())
         image.tag(repo, tag="minimal")
         os.remove("Dockerfile")
         result = client.images.push(repository=repo)
         print(result)
-
 
     def provide_hash(self, web_service_json):
         """
@@ -125,7 +132,7 @@ class TrainBuilder:
         with open(file, "wb") as f:
             f.write(encrypted_file)
 
-    def create_train_config(self, user_id: str, user_pk: str, user_signature, session_key, route, train_id):
+    def create_train_config(self, user_id: int, user_pk: str, user_signature, session_key, route, train_id):
         """
         Creates a keyfile given the values provided by the webservice and stores it in the current working  directory
         :param user_id: id of the user creating the train
@@ -191,15 +198,22 @@ class TrainBuilder:
         :return:
         :rtype:
         """
-        vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/station_pks/{station_id}"
+        url = os.getenv("vault_url")
+        vault_url = f"{url}/station_pks/{station_id}"
         headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
         data = r.json()["data"]
         return data["data"]["rsa_public_key"]
 
     def get_user_public_key(self, user_id):
+        """
+        Get
+        :param user_id:
+        :return:
+        """
         token = os.getenv("vault_token")
-        vault_url = f"https://vault.pht.medic.uni-tuebingen.de/v1/user_pks/{user_id}"
+        url = os.getenv("vault_url")
+        vault_url = f"{url}/user_pks/{user_id}"
         headers = {"X-Vault-Token": token}
         r = requests.get(vault_url, headers=headers)
         print(r.json())
@@ -269,7 +283,7 @@ class TrainBuilder:
         """
         hash = hashes.SHA512()
         hasher = hashes.Hash(hash, default_backend())
-        hasher.update(user_id.encode())
+        hasher.update(str(chr(user_id)).encode())
         self.hash_files(hasher, files)
         hasher.update(bytes(route))
         hasher.update(session_id)
@@ -290,7 +304,7 @@ class TrainBuilder:
 
 
 if __name__ == '__main__':
-    tb = TrainBuilder("https://vault.lukaszimmermann.dev/v1/cubbyhole/station_public_keys")
+    tb = TrainBuilder()
     # keys = tb.get_station_public_keys([1, 2, 3])
     sym_key = Fernet.generate_key()
     route = [1, 2, 3]

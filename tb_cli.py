@@ -4,7 +4,7 @@ from util import post_route_to_vault
 
 route = [1, 2, 3, 4]
 
-tb = TrainBuilder("https://vault.pht.medic.uni-tuebingen.de/")
+tb = TrainBuilder()
 
 
 if __name__ == '__main__':
@@ -26,5 +26,4 @@ if __name__ == '__main__':
     print("Building train..")
     tb.build_minimal_example(name=args["train_name"], file_path=entrypoint_path)
     # Post route to vault
-
 

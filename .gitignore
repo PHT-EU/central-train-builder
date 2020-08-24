@@ -4,3 +4,4 @@ upload
 build.sqlite
 testfile
 \venv
+.env

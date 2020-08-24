@@ -13,7 +13,10 @@ The addresses of the vault and harbor instances are currently hardcoded.
 ```
 harbor_user=<user>
 harbor_pw=<pw>
+harbor_url=https://harbor.pht.medic.uni-tuebingen.de/pht_incoming
 vault_token=<token>
+vault_url=https://vault.pht.medic.uni-tuebingen.de/v1
+
 ```
 
 ## CLI
