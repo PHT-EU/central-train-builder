@@ -60,10 +60,8 @@ def post_route_to_vault(name, route):
             "cas": 0
         },
         "data": {
-            "minimal_route": {
-                "harborProjects": route,
-                "repositorySuffix": "busybox"
-            },
+            "harborProjects": route,
+            "repositorySuffix": "busybox"
         }
     }
     try:

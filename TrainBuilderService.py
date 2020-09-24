@@ -11,7 +11,7 @@ app = web.Application()
 
 sio.attach(app)
 
-tb = TrainBuilder("https://vault.pht.medic.uni-tuebingen.de/")
+tb = TrainBuilder()
 
 # we can define aiohttp endpoints just as we normally
 # would with no change
@@ -48,17 +48,22 @@ async def generate_hash(sid, message):
     await sio.emit("generated_hash", data={"completed": True,
                                            "hash_value": hashed_value})
 
-@sio.on("build_train")
+# änder
+@sio.on("train")
 async def build_train(sid, message):
-    print("Building Train")
-    try:
-        tb.build_train(message)
+    data = json.JSONDecoder().decode(message)
+    if data.action == 'build':
 
-        await sio.emit("built_train", data={"completed": True})
-    except BaseException as e:
-        shutil.rmtree("pht_train")
-        print(e)
-        await sio.emit("build_failure", data={"failed": str(e)})
+        print("Building Train")
+        try:
+            tb.build_train(data.data)
+            await sio.emit("build_train", data={"completed": True})
+        except BaseException as e:
+            shutil.rmtree("pht_train")
+            print(e)
+            await sio.emit("build_failure", data={"failed": str(e)})
+    else:
+        print("No train to build")
 
 # We bind our aiohttp endpoint to our app
 # router
@@ -66,4 +71,4 @@ app.router.add_get('/', index)
 
 # We kick off our server
 if __name__ == '__main__':
-    web.run_app(app, host="localhost", port=7777)
+    web.run_app(app, host="0.0.0.0", port=7777)
