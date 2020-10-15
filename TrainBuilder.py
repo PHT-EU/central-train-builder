@@ -13,6 +13,7 @@ import tempfile
 import shutil
 from dotenv import load_dotenv
 from pathlib import Path
+import subprocess
 
 
 class TrainBuilder:
@@ -62,7 +63,7 @@ class TrainBuilder:
 
         self.create_temp_dockerfile(message, "train_config.json")
         image, logs = client.images.build(path=os.getcwd())
-        repo = f"harbor.pht.medic.uni-tuebingen.de/pht_incoming/{message['train_id']}"
+        repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}" #TODO change harbor
         image.tag(repo, tag="quick")
         # Remove files after image has been built successfully
         os.remove("train_config.json")
@@ -73,26 +74,58 @@ class TrainBuilder:
         # TODO remove image after pushing successfully
         return image
 
-    def build_minimal_example(self, name, file_path,
-                              master_image="harbor.pht.medic.uni-tuebingen.de/pht_master/python_train:master"):
-        with open("Dockerfile", "w") as f:
-            f.write("FROM " + master_image + "\n")
-            f.write(f"COPY {file_path} /opt/pht_train/entrypoint.py\n")
-            f.write('CMD ["python", /opt/pht_train/entrypoint.py]')
+    def build_example(self, data):
+        """
+        Build minimal example
+        :param data: The message received from train submission
+        :return: success response based on execptions
+        """
+        endpoints = data["endpoint"]
+        files = endpoints["files"]
+        file_name = files[0]["name"]
+        file_content = files[0]["content"]
+
+        path = "./"
+        file_path = path + file_name
+
+        train_id = data["train_id"]
+        # name = "train_id_" + str(train_id)
+        name = str(train_id)
+        with open(file_path, "w") as f:
+            f.write(file_content)
+
+        subprocess.Popen(["chmod", "+x", file_path])  # in order to exec
+        # master_image = data["master_image"] # Provice Peter with harbor credentials
+        master_image = "harbor.personalhealthtrain.de/pht_master/python_train:latest"
+        train_path = "/opt/pht_train/endpoints/minimaltrain/commands/run/" + file_name
+
+        with open("Dockerfile", "w", encoding='utf-8') as f:
+            f.write(f'FROM ' + master_image + '\n')
+            f.write(f'COPY {file_path} {train_path}\n')
+            f.write(f'ENTRYPOINT ["python", "{train_path}"]')
         client = docker.client.from_env()
         try:
             login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                         registry=self.registry_url)
-            print(login_result)
+            #print(login_result)
         except Exception as e:
             print(e)
-            exit(0)
-        repo = f"harbor.pht.medic.uni-tuebingen.de/pht_incoming/{name}"
+            return {"success": False, "msg": "Docker login error"}
+
+        # todo pull image if not available
+        repo = f"harbor.personalhealthtrain.de/pht_incoming/{name}"
         image, logs = client.images.build(path=os.getcwd())
         image.tag(repo, tag="minimal")
         os.remove("Dockerfile")
-        result = client.images.push(repository=repo)
-        print(result)
+        os.remove(file_path)
+        # todo remove image afterwards
+        try:
+            result = client.images.push(repository=repo)
+            print(result)
+            return {"success": True, "msg": "Successfully built train"}
+        except Exception as e:
+            print(e)
+            return {"success": False, "msg": "Docker push error"}
 
     def provide_hash(self, web_service_json):
         """
@@ -198,7 +231,7 @@ class TrainBuilder:
         :return:
         :rtype:
         """
-        url = os.getenv("vault_url")
+        url = self.vault_url
         vault_url = f"{url}/station_pks/{station_id}"
         headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
@@ -211,8 +244,8 @@ class TrainBuilder:
         :param user_id:
         :return:
         """
-        token = os.getenv("vault_token")
-        url = os.getenv("vault_url")
+        token = self.vault_token
+        url = self.vault_url
         vault_url = f"{url}/user_pks/{user_id}"
         headers = {"X-Vault-Token": token}
         r = requests.get(vault_url, headers=headers)

@@ -13,6 +13,7 @@ if __name__ == '__main__':
     parser.add_argument("--train_name", help="Name of the train", required=True)
     parser.add_argument("--route", help="Comma separated list of stations")
 
+    # Todo add recceiving periodic bool and if periodic add maxNumberOfStops (Int)
 
 
     args = parser.parse_args().__dict__
@@ -21,9 +22,11 @@ if __name__ == '__main__':
     if args.get("route", None):
         route = args["route"].split(",")
     print(f"Posting route {route} to vault under name {args['train_name']}\n")
+
     post_route_to_vault(args["train_name"], route)
     # Build basic train based on one file
     print("Building train..")
-    tb.build_minimal_example(name=args["train_name"], file_path=entrypoint_path)
+    #  not working anymore - adapted minimal example to usage of UI
+    tb.build_example(name=args["train_name"], file_path=entrypoint_path)
     # Post route to vault
 

@@ -47,13 +47,15 @@ def post_route_to_vault(name, route):
     """--header "X-Vault-Token: ..." \
     --request POST \
     --data @payload.json \
-    https://127.0.0.1:8200/v1/secret/data/user_pks/3
    """
-
     token = os.getenv("vault_token")
     url = os.getenv("vault_url")
     vault_url = f"{url}/kv-pht-routes/data/{name}"
     headers = {"X-Vault-Token": token}
+    """
+    ,
+        "maxNumberOfStops": 2
+    """
 
     payload = {
         "options": {
@@ -61,7 +63,8 @@ def post_route_to_vault(name, route):
         },
         "data": {
             "harborProjects": route,
-            "repositorySuffix": "busybox"
+            "repositorySuffix": "busybox",
+            "periodic": False
         }
     }
     try:
@@ -70,7 +73,7 @@ def post_route_to_vault(name, route):
         print(r.json())
     except Exception as e:
         print(e)
-
+        pass
 
 
 if __name__ == '__main__':
