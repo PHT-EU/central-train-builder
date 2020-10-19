@@ -49,7 +49,7 @@ class TrainBuilder:
 
         # login to the registry
         client = docker.client.from_env()
-        env_path = Path('.') / '.env'
+        env_path = '.env'
         load_dotenv(dotenv_path=env_path)
         print(os.getenv("harbor_user"))
 
