@@ -3,3 +3,5 @@ docker
 requests
 python-socketio
 aiohttp
+python-dotenv
+pyjwt

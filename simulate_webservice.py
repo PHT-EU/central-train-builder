@@ -144,16 +144,29 @@ async def simulate_client():
     def disconnect():
         print('disconnected from server')
 
-    await sio.connect('http://localhost:7777')
+    await sio.connect('http://localhost:3002')
     print('my sid is', sio.sid)
     await sio.emit("my_message", {"foo": 123565})
 
-    await sio.emit("generate_hash", data=create_json_message())
-    await sio.emit("build_minimal_example", data=create_json_message())
+    # await sio.emit("generate_hash", data=create_json_message())
+    # await sio.emit("build_minimal_example", data=create_json_message())
 
     await sio.wait()
 
 if __name__ == '__main__':
-    print(create_json_message())
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(simulate_client())
+    sio = socketio.Client()
+
+    @sio.event
+    def connect():
+        print("I'm connected!")
+
+    sio.connect('http://localhost:3002')
+
+    with open("test_message.json", "r") as f:
+        msg = json.load(f)
+        print(msg)
+
+    sio.emit("train", msg)
+
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(simulate_client())

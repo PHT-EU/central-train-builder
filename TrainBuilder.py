@@ -135,9 +135,15 @@ class TrainBuilder:
         """
         session_id = self._generate_session_id()
         self.session_id = session_id
-        files = self._get_files(web_service_json)
-        self.generate_hash(web_service_json["user_id"], files, web_service_json["route"], session_id)
-        return self.hash
+        # files = self._get_files(web_service_json)
+        files = web_service_json["endpoint"]["files"]
+        route = web_service_json["route"]
+        try:
+            train_hash = self.generate_hash(web_service_json["user_id"], files, route, session_id)
+            return {"success": True, "msg": train_hash}
+        except BaseException as e:
+            print(e)
+            return {"success": False, "msg": ""}
 
     def create_temp_dockerfile(self, web_service_json, train_config):
         """
@@ -314,8 +320,8 @@ class TrainBuilder:
         :param session_id: session id randomly created by TB
         :return: hash value to be signed offline by user
         """
-        hash = hashes.SHA512()
-        hasher = hashes.Hash(hash, default_backend())
+        # TODO check for SHA512 compatibility
+        hasher = hashes.Hash(hashes.SHA512(), default_backend())
         hasher.update(str(chr(user_id)).encode())
         self.hash_files(hasher, files)
         hasher.update(bytes(route))
@@ -327,7 +333,7 @@ class TrainBuilder:
     @staticmethod
     def hash_files(hasher: hashes.Hash, files: list):
         for file in files:
-            hasher.update(file.encode())
+            hasher.update(file["content"].encode())
 
     def _get_hash(self):
         if self.hash is not None:

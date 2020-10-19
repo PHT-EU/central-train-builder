@@ -63,7 +63,7 @@ def post_route_to_vault(name, route):
         },
         "data": {
             "harborProjects": route,
-            "repositorySuffix": "busybox",
+            "repositorySuffix": name,
             "periodic": False
         }
     }
@@ -77,11 +77,15 @@ def post_route_to_vault(name, route):
 
 
 if __name__ == '__main__':
-    env_path = Path('.') / '.env'
-    load_dotenv(dotenv_path=env_path)
-    # generate_rsa_key_pair("D:\\train-builder\\keys", "user_3")
-    query_vault(2)
+    # env_path = Path('.') / '.env'
+    # load_dotenv(dotenv_path=env_path)
+    # # generate_rsa_key_pair("D:\\train-builder\\keys", "user_3")
+    # query_vault(2)
     # post_vault_key(3)
     # client = docker.from_env()
     # logs = client.images.build(path=os.getcwd())
     # print(logs)
+    with open("startTrain.json", "r") as f:
+        message = json.load(f)
+    with open("test_message.json", "w") as f:
+        json.dump(message, f, indent=2)
