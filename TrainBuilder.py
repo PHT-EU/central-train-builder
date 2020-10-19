@@ -12,7 +12,6 @@ from simulate_webservice import create_json_message
 import tempfile
 import shutil
 from dotenv import load_dotenv
-from pathlib import Path
 import subprocess
 
 
@@ -140,7 +139,7 @@ class TrainBuilder:
         route = web_service_json["route"]
         try:
             train_hash = self.generate_hash(web_service_json["user_id"], files, route, session_id)
-            return {"success": True, "data": {"hash": train_hash}}
+            return {"success": True, "data": {"hash": train_hash.decode("utf-8")}}
         except BaseException as e:
             print(e)
             return {"success": False, "msg": ""}
