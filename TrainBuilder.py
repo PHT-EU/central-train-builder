@@ -18,7 +18,7 @@ import subprocess
 class TrainBuilder:
     def __init__(self):
         # docker login
-        env_path = Path('.') / '.env'
+        env_path = ".env"
         load_dotenv(env_path)
         self.vault_url = os.getenv("vault_url")
         self.vault_token = os.getenv("vault_token")
@@ -102,6 +102,7 @@ class TrainBuilder:
             f.write(f'FROM ' + master_image + '\n')
             f.write(f'COPY {file_path} {train_path}\n')
             f.write(f'ENTRYPOINT ["python", "{train_path}"]')
+
         client = docker.client.from_env()
         try:
             login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
@@ -139,7 +140,7 @@ class TrainBuilder:
         route = web_service_json["route"]
         try:
             train_hash = self.generate_hash(web_service_json["user_id"], files, route, session_id)
-            return {"success": True, "data": {"hash": train_hash.decode("utf-8")}}
+            return {"success": True, "data": {"hash": train_hash.decode()}}
         except BaseException as e:
             print(e)
             return {"success": False, "msg": ""}
