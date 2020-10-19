@@ -76,7 +76,6 @@ async def connect(sid, environ):
 @sio.on("train")
 async def build_train(sid, message):
     # TODO validate token
-    print(message)
     token = message["token"]
     if not validate_token(token):
         logging.warning(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} Unauthorized login attempt {sid}")
@@ -84,7 +83,7 @@ async def build_train(sid, message):
 
     try:
         if message["action"] == 'build':
-            print("building train")
+            print("Building train")
             try:
                 data = message["data"]
                 logging.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Received build request, train id:"
@@ -157,4 +156,4 @@ async def build_train(sid, message):
 
 # We kick off our server
 if __name__ == '__main__':
-    web.run_app(app, host="0.0.0.0", port=3002)
+    web.run_app(app, host="0.0.0.0", port=443)
