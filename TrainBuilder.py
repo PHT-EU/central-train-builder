@@ -115,7 +115,7 @@ class TrainBuilder:
         # todo pull image if not available
         repo = f"harbor.personalhealthtrain.de/pht_incoming/{name}"
         image, logs = client.images.build(path=os.getcwd())
-        image.tag(repo, tag="minimal")
+        image.tag(repo, tag="base")  # in order to be processed by train router
         os.remove("Dockerfile")
         os.remove(file_path)
         # todo remove image afterwards

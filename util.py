@@ -63,7 +63,7 @@ def post_route_to_vault(name, route):
         },
         "data": {
             "harborProjects": route,
-            "repositorySuffix": "busybox",
+            "repositorySuffix": name,
             "periodic": False
         }
     }
