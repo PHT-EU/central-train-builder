@@ -33,6 +33,8 @@ def validate_token(token):
         return True
     except jwt.ExpiredSignatureError:
         return False
+    except BaseException as e:
+        logging.error(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Token could not be authenticated\n {e}")
 
 
 async def index(request):
