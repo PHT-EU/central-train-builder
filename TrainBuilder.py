@@ -140,7 +140,7 @@ class TrainBuilder:
         route = web_service_json["route"]
         try:
             train_hash = self.generate_hash(web_service_json["user_id"], files, route, session_id)
-            return {"success": True, "data": {"hash": train_hash.decode()}}
+            return {"success": True, "data": {"hash": train_hash}}
         except BaseException as e:
             print(e)
             return {"success": False, "msg": ""}
@@ -328,7 +328,7 @@ class TrainBuilder:
         hasher.update(session_id)
         digest = hasher.finalize()
         self.hash = digest
-        return digest
+        return digest.hex()
 
     @staticmethod
     def hash_files(hasher: hashes.Hash, files: list):
