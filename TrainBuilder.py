@@ -58,6 +58,7 @@ class TrainBuilder:
                                         registry=self.registry_url)
             print(login_result)
         except Exception as e:
+            print("Train Builder login error")
             print(e)
 
         self.create_temp_dockerfile(message, "train_config.json")

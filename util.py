@@ -44,13 +44,14 @@ def query_vault(user_id):
 
 
 def post_route_to_vault(name, route):
+    load_dotenv(".env")
     """--header "X-Vault-Token: ..." \
     --request POST \
     --data @payload.json \
    """
     token = os.getenv("vault_token")
     url = os.getenv("vault_url")
-    vault_url = f"{url}/kv-pht-routes/data/{name}"
+    vault_url = f"{url}v1/kv-pht-routes/data/{name}"
     headers = {"X-Vault-Token": token}
     """
     ,
@@ -70,22 +71,24 @@ def post_route_to_vault(name, route):
     try:
         # TODO catch update of same route
         r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
+        print(r.reason)
         print(r.json())
     except Exception as e:
         print(e)
-        pass
 
 
 if __name__ == '__main__':
     # env_path = Path('.') / '.env'
-    # load_dotenv(dotenv_path=env_path)
+    load_dotenv(dotenv_path=".env")
     # # generate_rsa_key_pair("D:\\train-builder\\keys", "user_3")
     # query_vault(2)
     # post_vault_key(3)
     # client = docker.from_env()
     # logs = client.images.build(path=os.getcwd())
     # print(logs)
-    with open("startTrain.json", "r") as f:
-        message = json.load(f)
-    with open("test_message.json", "w") as f:
-        json.dump(message, f, indent=2)
+    post_route_to_vault("37", ["1", "2", "3"])
+
+    # with open("startTrain.json", "r") as f:
+    #     message = json.load(f)
+    # with open("test_message.json", "w") as f:
+    #     json.dump(message, f, indent=2)
