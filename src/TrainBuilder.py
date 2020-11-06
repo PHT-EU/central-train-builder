@@ -329,7 +329,10 @@ class TrainBuilder:
         :return: list of files to be hashed
         """
         # Generate the directory structure TODO support multiple commands/endpoints
-        os.mkdir(self.build_dir)
+        if not os.path.isdir(self.build_dir):
+            os.mkdir(self.build_dir)
+        else:
+            shutil.rmtree(os.path.join(self.build_dir, "pht_train"))
         base_path = os.path.join(self.build_dir, "pht_train")
         os.mkdir(base_path)
         ep_dir = os.path.join(base_path, 'endpoints')
