@@ -1,9 +1,7 @@
 import socketio
 from aiohttp import web
-from TrainBuilder import TrainBuilder
-import json
-import shutil
-from util import post_route_to_vault
+from src.TrainBuilder import TrainBuilder
+from src.util import post_route_to_vault
 import logging
 from datetime import datetime
 import jwt
@@ -21,7 +19,7 @@ tb = TrainBuilder()
 
 logging.basicConfig(filename="train_builder.log", level=logging.INFO)
 
-with open("rsa.public") as pk_file:
+with open("/home/rsa.public") as pk_file:
     pk = pk_file.read()
 
 
@@ -119,4 +117,4 @@ async def build_train(sid, message):
 
 # We kick off our server
 if __name__ == '__main__':
-    web.run_app(app, host="0.0.0.0", port=443)
+    web.run_app(app, host="0.0.0.0", port=7777)

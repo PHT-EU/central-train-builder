@@ -1,0 +1,28 @@
+{
+  "action": "build",
+  "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwibmFtZSI6ImFkbWluIiwiaWF0IjoxNjAzMTA0OTExLCJleHAiOjE2MDU3ODMzMTF9.QOdX9KPNEYh7TRNxRDbtziYNRBEw74crydX5Vt875p5UYCBWnKnjhoIVGpHWyr8Xql1Dj-TPc78UJZn_qYmZ7m5x6FX_qwRWZBmia_4CUzM7eX7UJWwTsfQBwNGK5RFbd6b1tmXilTCaDzbDqPXiKg_NE_htFnHyhC2cXZjdopw",
+  "data": {
+    "type": "discovery",
+    "train_id": "encrypted",
+    "user_id": 1,
+    "user_public_key": "-----BEGIN PUBLIC KEY-----\r\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr6ToGrckRNi2DGd9qE15\r\njYlghTi8V+NBl6hMoGPlUtD+S/E75OqswdL7i1FCSup5fguHmrf7YtMK7nZDCy4P\r\ntkJRsTysGs+P0arNd1CH9+AL6O7SlbgPTNzPmjylJ+KK66A6ala2jMfEuA3Ijkcc\r\nUQVNyvExUX9FQNvNzHLz89VyInnJrV0GPMnL5bXDO0p87LKUSQvR1X0BcU5DWJWw\r\nmxQHWC9GFBA1luROwSZ/73p87N8VmNCzzxWmBgphMWzJAfoWQYX3y75ABOwmzKbW\r\nHpwKCZRMZg4LX4GgSNQOQqD2GjeRxuBF/kyPBfmipsf1mJQw2B6/kmstceHB0aah\\newIDAQAB\r\n-----END PUBLIC KEY-----",
+    "user_signature": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+    "route": [
+      1,
+      2,
+      3
+    ],
+    "master_image": "harbor.personalhealthtrain.de/pht_master/python_train:master",
+    "endpoint": {
+      "name": "default",
+      "command": "run",
+      "files": [
+        {
+          "name": "entrypoint.py",
+          "content": "#!/usr/bin/env python\n\nimport pickle\nimport requests\nimport xml.etree.ElementTree as ET\nfrom datetime import datetime\nimport threading\nfrom dotenv import load_dotenv, find_dotenv\nimport os\n\n\ndef get_avg_age(xml):\n    \"\"\"\n    Returns the average age of the patients in the xml tree given by the xml input.\n\n    :param xml:  xml file given as string\n    \"\"\"\n\n    try:\n        xml_root = ET.fromstring(xml)\n    except:\n        print('Could not parse the xml.')\n        return\n\n    # extract namespace\n    ns = xml_root.tag[:xml_root.tag.rfind('}')+1]\n\n    birthdates = xml_root.findall(f'.//{ns}birthDate')\n\n    if not birthdates:\n        print(\"Empty patient list\")\n\n    today = datetime.now()\n\n    def __get_age(date, now):\n        \"\"\"\n        Calculates the age in years from a given birthdate (date) and the time now (now)\n\n        :param date: birthdate as string (e.g.: '1919-11-01')\n        :param now: datetime object corresponding to the current time\n        :return: age in years\n        \"\"\"\n\n        birthdate = datetime.fromisoformat(date.get('value'))\n\n        return now.year - birthdate.year - ((now.month, now.day) < (birthdate.month, birthdate.day))\n    try:\n        avg = sum([__get_age(date, today) for date in birthdates]) / len(birthdates)\n\n    except Exception as e:\n        print('Error method: {}'.format(e))\n        avg = 0\n        pass\n\n    return avg\n\n\nclass Train:\n    def __init__(self,  results=None):\n        # Results encoded with Pickle\n        self.results = results\n\n    def _load_results(self):\n        try:\n            with open(self.results, 'rb') as results_file:\n                return pickle.load(file=results_file)\n        except:\n            return {'analysis': {}, 'discovery': {}}\n\n    def _save_results(self, results):\n        with open(self.results, 'wb') as results_file:\n            return pickle.dump(results, results_file)\n\n    def _load_patients(self):\n        load_dotenv(find_dotenv())\n        FHIR_ADDRESS = os.getenv(\"FHIR_ADDRESS\")\n\n        headers = {\n            \"Accept\": \"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\",\n            \"Accept-Encoding\": \"gzip, deflate\",\n            \"Accept-Language\": \"de,en-US;q=0.7,en;q=0.3\",\n            \"Authorization\": \"Basic ZmhpcnVzZXI6Y2hhbmdlLXBhc3N3b3Jk\",\n            \"Connection\": \"keep-alive\",\n            \"Host\": FHIR_ADDRESS,\n            \"Upgrade-Insecure-Requests\": \"1\",\n            \"User-Agent\": \"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0\",\n        }\n        url = \"http://\" + FHIR_ADDRESS + \"/fhir-server/api/v4/Patient\"\n        return requests.get(url, headers=headers)\n\n    def run(self):\n        results = self._load_results()\n        local_res = 0\n\n        while local_res == 0:\n            fhir_data = self._load_patients()\n            xml = fhir_data.text\n            local_res = get_avg_age(xml)\n\n        results['discovery']['discovery_exec_' + str(len(results['discovery']) + 1)] = {'avg_age': local_res}\n        print(local_res)\n        self._save_results(results=results)\n        print(\"Results updated\")\n        exit(0)\n\n\ndef main():\n    train = Train(results='results.pkl')\n    train.run()\n\n\nif __name__ == \"__main__\":\n    main()\n\n"
+        }
+      ]
+    }
+  }
+}
+

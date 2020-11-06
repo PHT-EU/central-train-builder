@@ -1,5 +1,4 @@
 import docker
-import pickle
 import requests
 import os
 from cryptography.fernet import Fernet
@@ -8,8 +7,7 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 import json
 from base64 import b64encode
-from simulate_webservice import create_json_message
-import tempfile
+from src.simulate_webservice import create_json_message
 import shutil
 from dotenv import load_dotenv
 import subprocess
@@ -19,14 +17,20 @@ import redis
 class TrainBuilder:
     def __init__(self):
         # docker login
-        env_path = ".env"
+        env_path = "../.env"
         load_dotenv(env_path)
         self.vault_url = os.getenv("vault_url")
         self.vault_token = os.getenv("vault_token")
         self.hash = None
         self.registry_url = os.getenv("harbor_url")
         self.session_id = None
-        self.redis = redis.Redis(decode_responses=True)
+        self.redis = redis.Redis(host="redis", decode_responses=True)
+        self.build_dir = os.getenv("build_dir")
+
+        # cleanup build dir when starting a new session
+        if len(os.listdir(self.build_dir)) != 0:
+            shutil.rmtree(self.build_dir)
+
 
     def build_train(self, web_service_json:dict):
         """
@@ -52,9 +56,8 @@ class TrainBuilder:
 
         # login to the registry
         client = docker.client.from_env()
-        env_path = '.env'
+        env_path = '../.env'
         load_dotenv(dotenv_path=env_path)
-        print(os.getenv("harbor_user"))
 
         client = docker.client.from_env()
         try:
@@ -88,13 +91,12 @@ class TrainBuilder:
         # TODO remove image after pushing successfully
         return {"success": True, "msg": "Successfully built train"}
 
-    @staticmethod
-    def _cleanup():
+    def _cleanup(self):
         """
         Remove the files generated while building a train
 
         """
-        os.remove("train_config.json")
+        os.remove(os.path.join(self.build_dir, "train_config.json"))
         shutil.rmtree("pht_train")
         if os.path.isdir("pht_train"):
             os.rmdir("pht_train")
@@ -110,7 +112,7 @@ class TrainBuilder:
         file_name = files[0]["name"]
         file_content = files[0]["content"]
 
-        path = "./"
+        path = "../"
         file_path = path + file_name
 
         train_id = data["train_id"]
@@ -124,7 +126,7 @@ class TrainBuilder:
         master_image = "harbor.personalhealthtrain.de/pht_master/python_train:latest"
         train_path = "/opt/pht_train/endpoints/minimaltrain/commands/run/" + file_name
 
-        with open("Dockerfile", "w", encoding='utf-8') as f:
+        with open("../Dockerfile", "w", encoding='utf-8') as f:
             f.write(f'FROM ' + master_image + '\n')
             f.write(f'COPY {file_path} {train_path}\n')
             f.write(f'ENTRYPOINT ["python", "{train_path}"]')
@@ -142,7 +144,7 @@ class TrainBuilder:
         repo = f"harbor.personalhealthtrain.de/pht_incoming/{name}"
         image, logs = client.images.build(path=os.getcwd())
         image.tag(repo, tag="base")  # in order to be processed by train router
-        os.remove("Dockerfile")
+        os.remove("../Dockerfile")
         os.remove(file_path)
         # todo remove image afterwards
         try:
@@ -183,7 +185,7 @@ class TrainBuilder:
         structure of the train
         :return:
         """
-        with open("Dockerfile", "w") as f:
+        with open("../Dockerfile", "w") as f:
             f.write("FROM " + web_service_json["master_image"] + "\n")
             self.generate_pht_dir(web_service_json)
             f.write("COPY pht_train /opt/pht_train\n")
@@ -212,7 +214,6 @@ class TrainBuilder:
         """
 
         station_public_keys = self.get_station_public_keys(route)
-        print(station_public_keys)
         encrypted_session_key = self.encrypt_session_key(session_key, station_public_keys)
         # TODO check types of signatures/keys
         keys = {
@@ -229,7 +230,7 @@ class TrainBuilder:
             "digital_signature": None
         }
 
-        with open("train_config.json", "w") as kf:
+        with open(os.path.join(self.build_dir, "train_config.json"), "w") as kf:
             json.dump(keys, kf, indent=2)
 
     def encrypt_session_key(self, session_key, station_public_keys):
@@ -276,7 +277,6 @@ class TrainBuilder:
         headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
         data = r.json()["data"]
-        print(data)
         return data["data"]["rsa_public_key"]
 
     def get_user_public_key(self, user_id):
@@ -322,15 +322,15 @@ class TrainBuilder:
 
         return files
 
-    @staticmethod
-    def generate_pht_dir(message):
+    def generate_pht_dir(self, message):
         """
         Parses the message received from the webservice and  returns  a list of all files to be hashed
         :param message:
         :return: list of files to be hashed
         """
         # Generate the directory structure TODO support multiple commands/endpoints
-        base_path = "pht_train"
+        os.mkdir(self.build_dir)
+        base_path = os.path.join(self.build_dir, "pht_train")
         os.mkdir(base_path)
         ep_dir = os.path.join(base_path, 'endpoints')
         os.mkdir(ep_dir)

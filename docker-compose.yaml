@@ -1,0 +1,26 @@
+version: '3'
+services:
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+    - 6379:6379
+
+  train_builder:
+    container_name: train_builder
+    build: .
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./build_dir:/home/build_dir
+    environment:
+      - vault_token=vault_token
+      - vault_url=https://vault.pht.medic.uni-tuebingen.de/
+      - harbor_url=https://harbor.personalhealthtrain.de
+      - harbor_user=harbor_user
+      - harbor_pw=harbow_pw
+      - build_dir=/home/build_dir
+    ports:
+      - 7777:7777
+    depends_on:
+      - redis

@@ -1,6 +1,6 @@
-from TrainBuilder import TrainBuilder
+from src.TrainBuilder import TrainBuilder
 import argparse
-from util import post_route_to_vault
+from src.util import post_route_to_vault
 
 route = [1, 2, 3, 4]
 

@@ -44,7 +44,7 @@ def query_vault(user_id):
 
 
 def post_route_to_vault(name, route):
-    load_dotenv(".env")
+    load_dotenv("../.env")
     """--header "X-Vault-Token: ..." \
     --request POST \
     --data @payload.json \
@@ -77,5 +77,5 @@ def post_route_to_vault(name, route):
 
 if __name__ == '__main__':
     # env_path = Path('.') / '.env'
-    load_dotenv(dotenv_path=".env")
+    load_dotenv(dotenv_path="../.env")
     post_route_to_vault("37", ["1", "2", "3"])

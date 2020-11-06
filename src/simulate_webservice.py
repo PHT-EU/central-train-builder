@@ -162,7 +162,7 @@ if __name__ == '__main__':
 
     sio.connect('http://localhost:7777')
 
-    with open("test_message.json", "r") as f:
+    with open("../test_message.json", "r") as f:
         msg = json.load(f)
         print(msg)
 

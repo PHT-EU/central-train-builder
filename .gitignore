@@ -3,5 +3,6 @@ __pycache__
 upload
 build.sqlite
 testfile
-\venv
+/venv
 .env
+/build_dir
