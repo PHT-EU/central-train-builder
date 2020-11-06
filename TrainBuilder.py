@@ -56,26 +56,49 @@ class TrainBuilder:
         load_dotenv(dotenv_path=env_path)
         print(os.getenv("harbor_user"))
 
+        client = docker.client.from_env()
+        try:
+            login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
+                                        registry=self.registry_url)
+            # print(login_result)
+        except Exception as e:
+            print(e)
+            self._cleanup()
+            return {"success": False, "msg": "Docker login error"}
+
         try:
             login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                         registry=self.registry_url)
             print(login_result)
         except Exception as e:
+            self._cleanup()
             print("Train Builder login error")
             print(e)
 
+        # Generate a dockerfile and the directory structure based on the message
         self.create_temp_dockerfile(message, "train_config.json")
         image, logs = client.images.build(path=os.getcwd())
-        repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}" #TODO change harbor
+        repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}"
         image.tag(repo, tag="base")
         # Remove files after image has been built successfully
+        self._cleanup()
+        result = client.images.push(repository=repo,
+                                    tag="base")
+        # print(result)
+        # TODO remove image after pushing successfully
+        return {"success": True, "msg": "Successfully built train"}
+
+    @staticmethod
+    def _cleanup():
+        """
+        Remove the files generated while building a train
+
+        """
         os.remove("train_config.json")
         shutil.rmtree("pht_train")
-        result = client.images.push(repository=repo,
-                                    tag="quick")
-        print(result)
-        # TODO remove image after pushing successfully
-        return image
+        if os.path.isdir("pht_train"):
+            os.rmdir("pht_train")
+
 
     def build_example(self, data):
         """
@@ -307,18 +330,20 @@ class TrainBuilder:
         :param message:
         :return: list of files to be hashed
         """
-        os.mkdir("pht_train")
-        path = "pht_train"
-        for endpoint in message["endpoints"]:
-            endpoint_path = os.path.join(path, endpoint["name"])
-            os.mkdir(endpoint_path)
-            for command in endpoint["commands"]:
-                command_path = os.path.join(endpoint_path, command["name"])
-                os.mkdir(command_path)
-                for file in command["files"]:
-                    file_path = os.path.join(command_path, file[0])
-                    with open(file_path, "w") as f:
-                        f.write(file[1])
+        # Generate the directory structure TODO support multiple commands/endpoints
+        base_path = "pht_train"
+        os.mkdir(base_path)
+        ep_dir = os.path.join(base_path, 'endpoints')
+        os.mkdir(ep_dir)
+        ep_path = os.path.join(base_path, 'endpoints', message['endpoint']['name'])
+        os.mkdir(ep_path)
+        command_path = os.path.join(base_path,'endpoints', message['endpoint']['name'], message['endpoint']['command'])
+        os.mkdir(command_path)
+
+        for file in message["endpoint"]['files']:
+            file_path = os.path.join(command_path, file["name"])
+            with open(file_path, "w") as f:
+                f.write(file['content'])
 
         # for query_file in message["query_files"]:
         #    files.append((query_file, os.path.join(query_prefix, query_file)))

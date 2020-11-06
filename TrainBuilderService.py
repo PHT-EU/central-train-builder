@@ -51,28 +51,6 @@ async def connect(sid, environ):
     print(sid)
     await sio.emit('my_response', {'data': 'Connected', 'count': 0}, room=sid)
 
-# # If we wanted to create a new websocket endpoint,
-# # use this decorator, passing in the name of the
-# # event we wish to listen out for
-# @sio.on('my_message')
-# async def print_message(sid, message):
-#     # When we receive a new event of type
-#     # 'message' through a socket.io connection
-#     # we print the socket ID and the message
-#     print("Socket ID: ", sid)
-#     print(message)
-#
-#
-# @sio.on("generate_hash")
-# async def generate_hash(sid, message):
-#     json_message = json.JSONDecoder().decode(message)
-#     print("Generating Hash")
-#     hashed_value = tb.provide_hash(json_message)
-#     print(hashed_value)
-#
-#     await sio.emit("generated_hash", data={"completed": True,
-#                                            "hash_value": hashed_value})
-#
 
 @sio.on("train")
 async def build_train(sid, message):
