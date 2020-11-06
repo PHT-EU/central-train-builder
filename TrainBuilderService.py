@@ -143,4 +143,4 @@ async def build_train(sid, message):
 
 # We kick off our server
 if __name__ == '__main__':
-    web.run_app(app, host="0.0.0.0", port=443)
+    web.run_app(app, host="0.0.0.0", port=7777)

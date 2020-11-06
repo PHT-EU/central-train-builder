@@ -160,7 +160,7 @@ if __name__ == '__main__':
     def connect():
         print("I'm connected!")
 
-    sio.connect('http://localhost:443')
+    sio.connect('http://localhost:7777')
 
     with open("test_message.json", "r") as f:
         msg = json.load(f)
