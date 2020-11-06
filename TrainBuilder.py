@@ -99,7 +99,6 @@ class TrainBuilder:
         if os.path.isdir("pht_train"):
             os.rmdir("pht_train")
 
-
     def build_example(self, data):
         """
         Build minimal example
