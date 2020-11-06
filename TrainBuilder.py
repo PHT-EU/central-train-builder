@@ -13,6 +13,7 @@ import tempfile
 import shutil
 from dotenv import load_dotenv
 import subprocess
+import redis
 
 
 class TrainBuilder:
@@ -25,27 +26,29 @@ class TrainBuilder:
         self.hash = None
         self.registry_url = os.getenv("harbor_url")
         self.session_id = None
+        self.redis = redis.Redis(decode_responses=True)
 
-    def build_train(self, web_service_json):
+    def build_train(self, web_service_json:dict):
         """
-        :param web_service_json: The message received from the
+        Build a train based on the message sent from the UI, also generates a configuration file containing relevant
+        values for encryption
+
+        :param web_service_json: The content of the message received from the webservice
         :return: docker image of the final train
         """
 
         # Generate random number for session id, is this the right place?
         # session_id = os.urandom(64)
-        # # encrypt the query files before adding them to the image
+        # TODO encrypt the query files before adding them to the image
         session_key = Fernet.generate_key()
 
-        message = json.loads(web_service_json)
-
-        train_hash = self.provide_hash(message)
-
-        # fernet = Fernet(session_key)
-
-        # create trainconfig and store it in pickled form
-        self.create_train_config(message["user_id"], self.get_user_public_key(message["user_id"]),
-                                 message["user_signature"], session_key, message["route"], message["train_id"])
+        message = web_service_json
+        self.create_train_config(message["user_id"],
+                                 message["user_public_key"],
+                                 message["user_signature"],
+                                 session_key,
+                                 message["route"],
+                                 message["train_id"])
 
         # login to the registry
         client = docker.client.from_env()
@@ -64,7 +67,7 @@ class TrainBuilder:
         self.create_temp_dockerfile(message, "train_config.json")
         image, logs = client.images.build(path=os.getcwd())
         repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}" #TODO change harbor
-        image.tag(repo, tag="quick")
+        image.tag(repo, tag="base")
         # Remove files after image has been built successfully
         os.remove("train_config.json")
         shutil.rmtree("pht_train")
@@ -134,6 +137,7 @@ class TrainBuilder:
         :param web_service_json:
         :return:
         """
+        # TODO check this session id for correctness
         session_id = self._generate_session_id()
         self.session_id = session_id
         # files = self._get_files(web_service_json)
@@ -141,6 +145,10 @@ class TrainBuilder:
         route = web_service_json["route"]
         try:
             train_hash = self.generate_hash(web_service_json["user_id"], files, route, session_id)
+            print("Adding hash to redis")
+            self.redis.set(web_service_json['train_id'], value=self.hash)
+            print(f"Redis Hash value: {self.redis.get(web_service_json['train_id'])}")
+            self.hash = None
             return {"success": True, "data": {"hash": train_hash}}
         except BaseException as e:
             print(e)
@@ -180,8 +188,11 @@ class TrainBuilder:
         :param user_signature: signature created with the offline tool using the users private key
         :return:
         """
-        encrypted_session_key = self.encrypt_session_key(session_key, route)
+
         station_public_keys = self.get_station_public_keys(route)
+        print(station_public_keys)
+        encrypted_session_key = self.encrypt_session_key(session_key, station_public_keys)
+        # TODO check types of signatures/keys
         keys = {
             "user_id": user_id,
             "train_id": train_id,
@@ -189,23 +200,23 @@ class TrainBuilder:
             "rsa_user_public_key": user_pk,
             "encrypted_key": encrypted_session_key,
             "rsa_public_keys": station_public_keys,
-            "e_h": b64encode(self.hash).decode(),
+            "e_h": self.redis.get(train_id),
             "e_h_sig": user_signature,
             "e_d": None,
             "e_d_sig": None,
             "digital_signature": None
         }
+
         with open("train_config.json", "w") as kf:
             json.dump(keys, kf, indent=2)
 
-    def encrypt_session_key(self, session_key, route):
+    def encrypt_session_key(self, session_key, station_public_keys):
         """
         Encrypts the generated symmetric key with all public keys of the stations on the route
         :param session_key:
         :param route:
         :return:
         """
-        station_public_keys = self.get_station_public_keys(route)
         encrypted_session_key = {}
         for idx, key in station_public_keys.items():
             pk = self.load_public_key(key.encode())
@@ -239,10 +250,11 @@ class TrainBuilder:
         :rtype:
         """
         url = self.vault_url
-        vault_url = f"{url}/station_pks/{station_id}"
+        vault_url = f"{url}v1/station_pks/{station_id}"
         headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
         data = r.json()["data"]
+        print(data)
         return data["data"]["rsa_public_key"]
 
     def get_user_public_key(self, user_id):
@@ -253,10 +265,9 @@ class TrainBuilder:
         """
         token = self.vault_token
         url = self.vault_url
-        vault_url = f"{url}/user_pks/{user_id}"
+        vault_url = f"{url}v1/user_pks/{user_id}"
         headers = {"X-Vault-Token": token}
         r = requests.get(vault_url, headers=headers)
-        print(r.json())
         data = r.json()["data"]
         return data["data"]["rsa_public_key"]
 
@@ -321,15 +332,14 @@ class TrainBuilder:
         :param session_id: session id randomly created by TB
         :return: hash value to be signed offline by user
         """
-        # TODO check for SHA512 compatibility
         hasher = hashes.Hash(hashes.SHA512(), default_backend())
         hasher.update(str(chr(user_id)).encode())
         self.hash_files(hasher, files)
         hasher.update(bytes(route))
         hasher.update(session_id)
         digest = hasher.finalize()
-        self.hash = digest
-        return digest.hex()
+        self.hash = digest.hex()
+        return self.hash
 
     @staticmethod
     def hash_files(hasher: hashes.Hash, files: list):

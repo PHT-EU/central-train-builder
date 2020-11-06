@@ -5,7 +5,7 @@ adding these images to the pht/incoming harbor project and adding the associated
 ## Installation
 This package requires docker to be installed on the host machine.  
 The required python 3 packages can be installed via  `pip install -r requirements.txt`
-
+Make sure there is a redis instance running and available on `localhost:6379`
 ## Configuration/Authentification
 To access harbor and vault, username and password or an authentification token are respectively required. These are read
 by the TrainBuilder from a `.env` file in the projects root directory.

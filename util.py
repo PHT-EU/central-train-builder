@@ -68,27 +68,14 @@ def post_route_to_vault(name, route):
             "periodic": False
         }
     }
-    try:
-        # TODO catch update of same route
-        r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
-        print(r.reason)
-        print(r.json())
-    except Exception as e:
-        print(e)
+    r = requests.post(vault_url, headers=headers, data=json.dumps(payload))
+    response_msg = r.json()
+    if "errors" in response_msg.keys():
+        raise ValueError(f"Route could not be added to vault \n {response_msg['errors']}")
+
 
 
 if __name__ == '__main__':
     # env_path = Path('.') / '.env'
     load_dotenv(dotenv_path=".env")
-    # # generate_rsa_key_pair("D:\\train-builder\\keys", "user_3")
-    # query_vault(2)
-    # post_vault_key(3)
-    # client = docker.from_env()
-    # logs = client.images.build(path=os.getcwd())
-    # print(logs)
     post_route_to_vault("37", ["1", "2", "3"])
-
-    # with open("startTrain.json", "r") as f:
-    #     message = json.load(f)
-    # with open("test_message.json", "w") as f:
-    #     json.dump(message, f, indent=2)
