@@ -19,7 +19,7 @@ tb = TrainBuilder()
 
 logging.basicConfig(filename="train_builder.log", level=logging.INFO)
 
-with open("/home/rsa.public") as pk_file:
+with open("./rsa.public") as pk_file:
     pk = pk_file.read()
 
 

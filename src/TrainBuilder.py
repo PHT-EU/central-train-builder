@@ -9,30 +9,39 @@ import json
 from base64 import b64encode
 from src.simulate_webservice import create_json_message
 import shutil
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import subprocess
 import redis
+import tempfile
+import glob
 
 
 class TrainBuilder:
     def __init__(self):
         # docker login
-        env_path = "../.env"
-        load_dotenv(env_path)
+        load_dotenv(find_dotenv())
         self.vault_url = os.getenv("vault_url")
         self.vault_token = os.getenv("vault_token")
         self.hash = None
         self.registry_url = os.getenv("harbor_url")
         self.session_id = None
-        self.redis = redis.Redis(host="redis", decode_responses=True)
+        self.redis = redis.Redis(decode_responses=True)
         self.build_dir = os.getenv("build_dir")
+        self.entrypoint = None
+        if not self.build_dir:
+            self.build_dir = os.path.abspath("./build_dir")
+            if not os.path.isdir("./build_dir"):
+                os.mkdir("./build_dir")
+            else:
+                files = glob.glob(f'{self.build_dir}/*')
+                for f in files:
+                    if os.path.isdir(f):
+                        shutil.rmtree(f)
+                    else:
+                        os.remove(f)
+                # raise ValueError("No build directory specified and default dir already exists")
 
-        # cleanup build dir when starting a new session
-        if len(os.listdir(self.build_dir)) != 0:
-            shutil.rmtree(self.build_dir)
-
-
-    def build_train(self, web_service_json:dict):
+    def build_train(self, web_service_json: dict):
         """
         Build a train based on the message sent from the UI, also generates a configuration file containing relevant
         values for encryption
@@ -47,15 +56,8 @@ class TrainBuilder:
         session_key = Fernet.generate_key()
 
         message = web_service_json
-        self.create_train_config(message["user_id"],
-                                 message["user_public_key"],
-                                 message["user_signature"],
-                                 session_key,
-                                 message["route"],
-                                 message["train_id"])
 
         # login to the registry
-        client = docker.client.from_env()
         env_path = '../.env'
         load_dotenv(dotenv_path=env_path)
 
@@ -72,22 +74,31 @@ class TrainBuilder:
         try:
             login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                         registry=self.registry_url)
-            print(login_result)
         except Exception as e:
             self._cleanup()
             print("Train Builder login error")
             print(e)
 
-        # Generate a dockerfile and the directory structure based on the message
-        self.create_temp_dockerfile(message, "train_config.json")
-        image, logs = client.images.build(path=os.getcwd())
+        # Build train directory and configuration file before copying to the image
+
+        self.generate_pht_dir(message)
+        self.create_train_config(message["user_id"],
+                                 message["user_public_key"],
+                                 message["user_signature"],
+                                 session_key,
+                                 message["route"],
+                                 message["train_id"])
+
+        # Generate the dockerfile
+        self.create_temp_dockerfile(message)
+        image, logs = client.images.build(path=self.build_dir)
         repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}"
         image.tag(repo, tag="base")
         # Remove files after image has been built successfully
         self._cleanup()
         result = client.images.push(repository=repo,
                                     tag="base")
-        # print(result)
+        print(result)
         # TODO remove image after pushing successfully
         return {"success": True, "msg": "Successfully built train"}
 
@@ -96,64 +107,64 @@ class TrainBuilder:
         Remove the files generated while building a train
 
         """
-        os.remove(os.path.join(self.build_dir, "train_config.json"))
-        shutil.rmtree("pht_train")
-        if os.path.isdir("pht_train"):
+        self.entrypoint = None
+        shutil.rmtree(os.path.join(self.build_dir, "pht_train"))
+        if os.path.isdir(os.path.join(self.build_dir, "pht_train")):
             os.rmdir("pht_train")
 
-    def build_example(self, data):
-        """
-        Build minimal example
-        :param data: The message received from train submission
-        :return: success response based on execptions
-        """
-        endpoints = data["endpoint"]
-        files = endpoints["files"]
-        file_name = files[0]["name"]
-        file_content = files[0]["content"]
-
-        path = "../"
-        file_path = path + file_name
-
-        train_id = data["train_id"]
-        # name = "train_id_" + str(train_id)
-        name = str(train_id)
-        with open(file_path, "w") as f:
-            f.write(file_content)
-
-        subprocess.Popen(["chmod", "+x", file_path])  # in order to exec
-        # master_image = data["master_image"] # Provice Peter with harbor credentials
-        master_image = "harbor.personalhealthtrain.de/pht_master/python_train:latest"
-        train_path = "/opt/pht_train/endpoints/minimaltrain/commands/run/" + file_name
-
-        with open("../Dockerfile", "w", encoding='utf-8') as f:
-            f.write(f'FROM ' + master_image + '\n')
-            f.write(f'COPY {file_path} {train_path}\n')
-            f.write(f'ENTRYPOINT ["python", "{train_path}"]')
-
-        client = docker.client.from_env()
-        try:
-            login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
-                                        registry=self.registry_url)
-            #print(login_result)
-        except Exception as e:
-            print(e)
-            return {"success": False, "msg": "Docker login error"}
-
-        # todo pull image if not available
-        repo = f"harbor.personalhealthtrain.de/pht_incoming/{name}"
-        image, logs = client.images.build(path=os.getcwd())
-        image.tag(repo, tag="base")  # in order to be processed by train router
-        os.remove("../Dockerfile")
-        os.remove(file_path)
-        # todo remove image afterwards
-        try:
-            result = client.images.push(repository=repo)
-            print(result)
-            return {"success": True, "msg": "Successfully built train"}
-        except Exception as e:
-            print(e)
-            return {"success": False, "msg": "Docker push error"}
+    # def build_example(self, data):
+    #     """
+    #     Build minimal example
+    #     :param data: The message received from train submission
+    #     :return: success response based on execptions
+    #     """
+    #     endpoints = data["endpoint"]
+    #     files = endpoints["files"]
+    #     file_name = files[0]["name"]
+    #     file_content = files[0]["content"]
+    #
+    #     path = "../"
+    #     file_path = path + file_name
+    #
+    #     train_id = data["train_id"]
+    #     # name = "train_id_" + str(train_id)
+    #     name = str(train_id)
+    #     with open(file_path, "w") as f:
+    #         f.write(file_content)
+    #
+    #     subprocess.Popen(["chmod", "+x", file_path])  # in order to exec
+    #     # master_image = data["master_image"] # Provice Peter with harbor credentials
+    #     master_image = "harbor.personalhealthtrain.de/pht_master/python_train:latest"
+    #     train_path = "/opt/pht_train/endpoints/minimaltrain/commands/run/" + file_name
+    #
+    #     with open("../Dockerfile", "w", encoding='utf-8') as f:
+    #         f.write(f'FROM ' + master_image + '\n')
+    #         f.write(f'COPY {file_path} {train_path}\n')
+    #         f.write(f'ENTRYPOINT ["python", "{train_path}"]')
+    #
+    #     client = docker.client.from_env()
+    #     try:
+    #         login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
+    #                                     registry=self.registry_url)
+    #         # print(login_result)
+    #     except Exception as e:
+    #         print(e)
+    #         return {"success": False, "msg": "Docker login error"}
+    #
+    #     # todo pull image if not available
+    #     repo = f"harbor.personalhealthtrain.de/pht_incoming/{name}"
+    #     image, logs = client.images.build(path=os.getcwd())
+    #     image.tag(repo, tag="base")  # in order to be processed by train router
+    #     os.remove("../Dockerfile")
+    #     os.remove(file_path)
+    #     # todo remove image afterwards
+    #     try:
+    #         result = client.images.push(repository=repo)
+    #         print(result)
+    #         return {"success": True, "msg": "Successfully built train"}
+    #     except Exception as e:
+    #         print(e)
+    #         return {"success": False, "msg": "Docker push error"}
 
     def provide_hash(self, web_service_json):
         """
@@ -178,18 +189,18 @@ class TrainBuilder:
             print(e)
             return {"success": False, "msg": ""}
 
-    def create_temp_dockerfile(self, web_service_json, train_config):
+    def create_temp_dockerfile(self, web_service_json):
         """
         Creates a dockerfile to build a train image
         :param endpoints: Dictionary created from message from webservice containing  all files defining the file
         structure of the train
         :return:
         """
-        with open("../Dockerfile", "w") as f:
-            f.write("FROM " + web_service_json["master_image"] + "\n")
-            self.generate_pht_dir(web_service_json)
-            f.write("COPY pht_train /opt/pht_train\n")
-            f.write("COPY " + train_config + " " + "/opt/pht_train/train_config.json" + "\n")
+        # TODO change entrypoint based on user input
+        with open(os.path.join(os.path.abspath(self.build_dir), "Dockerfile"), "w") as df:
+            df.write(f"FROM  {web_service_json['master_image']}\n")
+            df.write(f"COPY ./pht_train /opt/pht_train\n")
+            df.write(f'ENTRYPOINT ["python", "/opt/{self.entrypoint}"]')
 
     @staticmethod
     def encrypt_file(fernet: Fernet, file):
@@ -229,8 +240,12 @@ class TrainBuilder:
             "e_d_sig": None,
             "digital_signature": None
         }
-
-        with open(os.path.join(self.build_dir, "train_config.json"), "w") as kf:
+        train_dir = os.path.join(self.build_dir, "pht_train")
+        if not os.path.isdir(train_dir):
+            os.mkdir(train_dir)
+        config_file = os.path.join(train_dir, "train_config.json")
+        with open(config_file, "w") as kf:
+            print(f"Writing config at {config_file}")
             json.dump(keys, kf, indent=2)
 
     def encrypt_session_key(self, session_key, station_public_keys):
@@ -340,11 +355,17 @@ class TrainBuilder:
         os.mkdir(ep_dir)
         ep_path = os.path.join(base_path, 'endpoints', message['endpoint']['name'])
         os.mkdir(ep_path)
-        command_path = os.path.join(base_path,'endpoints', message['endpoint']['name'], message['endpoint']['command'])
+        command_path = os.path.join(base_path, 'endpoints', message['endpoint']['name'], message['endpoint']['command'])
         os.mkdir(command_path)
 
         for file in message["endpoint"]['files']:
             file_path = os.path.join(command_path, file["name"])
+            if file['name'] == "entrypoint.py":
+                # Entrypoint path relativ to train directory
+                self.entrypoint = "/".join(str(file_path).split("/")[-5:])
+            elif file.get("type") == "entrypoint":
+                # TODO entrypoints need to be designated specifically -> Error handling
+                pass
             with open(file_path, "w") as f:
                 f.write(file['content'])
 

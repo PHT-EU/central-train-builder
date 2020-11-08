@@ -14,11 +14,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./build_dir:/home/build_dir
     environment:
-      - vault_token=vault_token
+      - vault_token=s.jmMOV4W43R2zQ2WOuSQMwsV9
       - vault_url=https://vault.pht.medic.uni-tuebingen.de/
       - harbor_url=https://harbor.personalhealthtrain.de
-      - harbor_user=harbor_user
-      - harbor_pw=harbow_pw
+      - harbor_user=graf
+      - harbor_pw=Start123!
       - build_dir=/home/build_dir
     ports:
       - 7777:7777
