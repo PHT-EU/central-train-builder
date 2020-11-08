@@ -2,10 +2,30 @@
 This repository contains the TrainBuilder class responsible for building train Images according to a given schema,
 adding these images to the pht/incoming harbor project and adding the associated to Vault storage
 
+## Starting the service:
+1. Edit the environment variable in the `docker-compose.yaml` file with the required values
+    ```
+    - vault_token=<vault_token>
+    - vault_url=https://vault.pht.medic.uni-tuebingen.de/
+    - harbor_url=https://harbor.personalhealthtrain.de
+    - harbor_user=<harbor_user>
+    - harbor_pw=<harbor_pw>
+    - build_dir=/home/build_dir
+    ```
+
+2. Build the image and run the services: 
+    ```
+    docker-compose build
+    docker-compose up
+    ```
+
+
+
 ## Installation
 This package requires docker to be installed on the host machine.  
 The required python 3 packages can be installed via  `pip install -r requirements.txt`
 Make sure there is a redis instance running and available on `localhost:6379`
+
 ## Configuration/Authentification
 To access harbor and vault, username and password or an authentification token are respectively required. These are read
 by the TrainBuilder from a `.env` file in the projects root directory.

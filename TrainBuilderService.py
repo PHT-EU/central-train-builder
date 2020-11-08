@@ -5,6 +5,7 @@ from src.util import post_route_to_vault
 import logging
 from datetime import datetime
 import jwt
+import os
 
 sio = socketio.AsyncServer()
 
@@ -14,12 +15,14 @@ sio.attach(app)
 
 tb = TrainBuilder()
 
-# we can define aiohttp endpoints just as we normally
-# would with no change
+# Directory the TB is running under
+tb_dir = '/home'
 
-logging.basicConfig(filename="train_builder.log", level=logging.INFO)
+# Setup loggin and public key
 
-with open("./rsa.public") as pk_file:
+logging.basicConfig(filename=os.path.join(tb_dir, "train_builder.log"), level=logging.INFO)
+
+with open(os.path.join(tb_dir, "rsa.public"), "r") as pk_file:
     pk = pk_file.read()
 
 
