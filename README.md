@@ -13,6 +13,7 @@ adding these images to the pht/incoming harbor project and adding the associated
     - harbor_user=<harbor_user>
     - harbor_pw=<harbor_pw>
     - build_dir=/home/build_dir
+    - tb_dir=/home
     ```
 
 2. Build the image and run the services: 
