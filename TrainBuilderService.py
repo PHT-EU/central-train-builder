@@ -16,7 +16,8 @@ sio.attach(app)
 tb = TrainBuilder()
 
 # Directory the TB is running under
-tb_dir = '/home'
+tb_dir = os.getenv("tb_dir") if os.getenv("tb_dir") else os.getcwd()
+print(tb_dir)
 
 # Setup loggin and public key
 

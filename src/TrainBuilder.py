@@ -25,7 +25,14 @@ class TrainBuilder:
         self.hash = None
         self.registry_url = os.getenv("harbor_url")
         self.session_id = None
-        self.redis = redis.Redis(decode_responses=True)
+        # Connect to redis either in docker-compose container or on localhost
+        try:
+            self.redis = redis.Redis("redis", decode_responses=True)
+            self.redis.ping()
+        except redis.exceptions.ConnectionError as e:
+            print("Redis container not found, attempting connection on localhost")
+            self.redis = redis.Redis(decode_responses=True)
+            print(self.redis.ping())
         self.build_dir = os.getenv("build_dir")
         self.entrypoint = None
         if not self.build_dir:

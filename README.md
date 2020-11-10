@@ -2,7 +2,9 @@
 This repository contains the TrainBuilder class responsible for building train Images according to a given schema,
 adding these images to the pht/incoming harbor project and adding the associated to Vault storage
 
-## Starting the service:
+## Starting the service
+
+### docker-compose 
 1. Edit the environment variable in the `docker-compose.yaml` file with the required values
     ```
     - vault_token=<vault_token>
@@ -18,6 +20,8 @@ adding these images to the pht/incoming harbor project and adding the associated
     docker-compose build
     docker-compose up
     ```
+   
+### system service
 
 
 
