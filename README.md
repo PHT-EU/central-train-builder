@@ -5,7 +5,7 @@ adding these images to the pht/incoming harbor project and adding the associated
 ## Starting the service
 
 ### docker-compose 
-1. Edit the environment variable in the `docker-compose.yaml` file with the required values
+1. Edit the environment variables in the `docker-compose.yaml` file with the required values
     ```
     - vault_token=<vault_token>
     - vault_url=https://vault.pht.medic.uni-tuebingen.de/
