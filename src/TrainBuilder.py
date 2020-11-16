@@ -10,9 +10,7 @@ from base64 import b64encode
 from src.simulate_webservice import create_json_message
 import shutil
 from dotenv import load_dotenv, find_dotenv
-import subprocess
 import redis
-import tempfile
 import glob
 
 
@@ -78,36 +76,33 @@ class TrainBuilder:
             self._cleanup()
             return {"success": False, "msg": "Docker login error"}
 
+        # Generate train directory and configuration file before copying to the image
         try:
-            login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
-                                        registry=self.registry_url)
-        except Exception as e:
+            self.generate_pht_dir(message)
+            self.create_train_config(message["user_id"],
+                                     message["user_public_key"],
+                                     message["user_signature"],
+                                     session_key.hex(),
+                                     message["route"],
+                                     message["train_id"])
+
+            # Generate the dockerfile
+            self.create_temp_dockerfile(message)
+            image, logs = client.images.build(path=self.build_dir)
+            repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}"
+            image.tag(repo, tag="base")
+            # Remove files after image has been built successfully
             self._cleanup()
-            print("Train Builder login error")
+            result = client.images.push(repository=repo,
+                                        tag="base")
+            image.remove()
+            print(result)
+            # TODO remove image after pushing successfully
+            return {"success": True, "msg": "Successfully built train"}
+        except Exception as e:
             print(e)
-
-        # Build train directory and configuration file before copying to the image
-
-        self.generate_pht_dir(message)
-        self.create_train_config(message["user_id"],
-                                 message["user_public_key"],
-                                 message["user_signature"],
-                                 session_key,
-                                 message["route"],
-                                 message["train_id"])
-
-        # Generate the dockerfile
-        self.create_temp_dockerfile(message)
-        image, logs = client.images.build(path=self.build_dir)
-        repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}"
-        image.tag(repo, tag="base")
-        # Remove files after image has been built successfully
-        self._cleanup()
-        result = client.images.push(repository=repo,
-                                    tag="base")
-        print(result)
-        # TODO remove image after pushing successfully
-        return {"success": True, "msg": "Successfully built train"}
+            self._cleanup()
+            return {"success": False, "msg": "Error building train}"}
 
     def _cleanup(self):
         """
@@ -186,7 +181,7 @@ class TrainBuilder:
         files = web_service_json["endpoint"]["files"]
         route = web_service_json["route"]
         try:
-            train_hash = self.generate_hash(web_service_json["user_id"], files, route, session_id)
+            train_hash = self.generate_hash(web_service_json["user_id"], files, route, bytes.fromhex(session_id))
             print("Adding hash to redis")
             self.redis.set(web_service_json['train_id'], value=self.hash)
             print(f"Redis Hash value: {self.redis.get(web_service_json['train_id'])}")
@@ -194,7 +189,7 @@ class TrainBuilder:
             return {"success": True, "data": {"hash": train_hash}}
         except BaseException as e:
             print(e)
-            return {"success": False, "msg": ""}
+            return {"success": False, "msg": "Unable to generate Hash"}
 
     def create_temp_dockerfile(self, web_service_json):
         """
@@ -207,6 +202,7 @@ class TrainBuilder:
         with open(os.path.join(os.path.abspath(self.build_dir), "Dockerfile"), "w") as df:
             df.write(f"FROM  {web_service_json['master_image']}\n")
             df.write(f"COPY ./pht_train /opt/pht_train\n")
+            df.write(f"RUN mkdir /opt/pht_results")
             df.write(f'ENTRYPOINT ["python", "/opt/{self.entrypoint}"]')
 
     @staticmethod
@@ -237,7 +233,7 @@ class TrainBuilder:
         keys = {
             "user_id": user_id,
             "train_id": train_id,
-            "session_id": b64encode(os.urandom(64)).decode(),
+            "session_id": self._generate_session_id(),
             "rsa_user_public_key": user_pk,
             "encrypted_key": encrypted_session_key,
             "rsa_public_keys": station_public_keys,
@@ -264,14 +260,14 @@ class TrainBuilder:
         """
         encrypted_session_key = {}
         for idx, key in station_public_keys.items():
-            pk = self.load_public_key(key.encode())
+            pk = self.load_public_key(bytes.fromhex(key))
             encrypted_key = pk.encrypt(session_key,
                                        padding.OAEP(
                                            mgf=padding.MGF1(algorithm=hashes.SHA512()),
                                            algorithm=hashes.SHA512(),
                                            label=None
                                        ))
-            encrypted_session_key[idx] = b64encode(encrypted_key).decode()
+            encrypted_session_key[idx] = encrypted_key.hex()
 
         return encrypted_session_key
 
@@ -298,7 +294,7 @@ class TrainBuilder:
         vault_url = f"{url}v1/station_pks/{station_id}"
         headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
-        data = r.json()["data"]
+        data = r.json()
         return data["data"]["rsa_public_key"]
 
     def get_user_public_key(self, user_id):
@@ -327,7 +323,7 @@ class TrainBuilder:
 
     @staticmethod
     def _generate_session_id():
-        return os.urandom(64)
+        return os.urandom(64).hex()
 
     @staticmethod
     def _get_files(message):
@@ -368,7 +364,7 @@ class TrainBuilder:
         for file in message["endpoint"]['files']:
             file_path = os.path.join(command_path, file["name"])
             if file['name'] == "entrypoint.py":
-                # Entrypoint path relativ to train directory
+                # Entrypoint path relative to train directory
                 self.entrypoint = "/".join(str(file_path).split("/")[-5:])
             elif file.get("type") == "entrypoint":
                 # TODO entrypoints need to be designated specifically -> Error handling
