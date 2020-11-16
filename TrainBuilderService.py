@@ -121,9 +121,11 @@ async def build_train(sid, message):
 
     # Validate a user submitted docker image and generate the security values for it
     # TODO implement this
-    elif message["action"] == "validateImage":
+    elif message["action"] == "generateImageHash":
         print("Validating image")
-
+    # TODO
+    elif message["action"] == "buildWithImage":
+        pass
     else:
         return {"success": False, "msg": "Unrecognized command"}, 300
 
