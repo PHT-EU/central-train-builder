@@ -3,14 +3,14 @@
   "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwibmFtZSI6ImFkbWluIiwiaWF0IjoxNjAzMTA0OTExLCJleHAiOjE2MDU3ODMzMTF9.QOdX9KPNEYh7TRNxRDbtziYNRBEw74crydX5Vt875p5UYCBWnKnjhoIVGpHWyr8Xql1Dj-TPc78UJZn_qYmZ7m5x6FX_qwRWZBmia_4CUzM7eX7UJWwTsfQBwNGK5RFbd6b1tmXilTCaDzbDqPXiKg_NE_htFnHyhC2cXZjdopw",
   "data": {
     "type": "discovery",
-    "train_id": "encrypted",
+    "train_id": "tb_hex_test_1",
     "user_id": 1,
     "user_public_key": "-----BEGIN PUBLIC KEY-----\r\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr6ToGrckRNi2DGd9qE15\r\njYlghTi8V+NBl6hMoGPlUtD+S/E75OqswdL7i1FCSup5fguHmrf7YtMK7nZDCy4P\r\ntkJRsTysGs+P0arNd1CH9+AL6O7SlbgPTNzPmjylJ+KK66A6ala2jMfEuA3Ijkcc\r\nUQVNyvExUX9FQNvNzHLz89VyInnJrV0GPMnL5bXDO0p87LKUSQvR1X0BcU5DWJWw\r\nmxQHWC9GFBA1luROwSZ/73p87N8VmNCzzxWmBgphMWzJAfoWQYX3y75ABOwmzKbW\r\nHpwKCZRMZg4LX4GgSNQOQqD2GjeRxuBF/kyPBfmipsf1mJQw2B6/kmstceHB0aah\\newIDAQAB\r\n-----END PUBLIC KEY-----",
     "user_signature": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
     "route": [
-      1,
-      2,
-      3
+      "aachen",
+      "tuebingen",
+      "leipzig"
     ],
     "master_image": "harbor.personalhealthtrain.de/pht_master/python_train:master",
     "endpoint": {
