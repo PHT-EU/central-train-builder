@@ -71,24 +71,27 @@ async def build_train(sid, message):
         route = data["route"]
         route = [str(x) for x in route]  # TR requires strings as harborProjects
 
-        logging.info(f"Posting route to vault:\nid: {data['train_id']}")
-        # Add the route to vault to storage for processing by the train router
-        try:
-            post_route_to_vault(train_id, route)
-        except ValueError as error:
-            err(f"Error adding route to vault {data['train_id']}:\n {error}")
 
-            return {"success": False, "msg": "Route could not be added to vault"}, 300
         logging.info(f"Building the train, id: {data['train_id']}")
 
         msg = tb.build_train(data)
         if msg["success"]:
             logging.info(f"Successfully built train: id {data['train_id']}")
             print(msg)
+            logging.info(f"Posting route to vault:\nid: {data['train_id']}")
+            # Add the route to vault to storage for processing by the train router
+            try:
+                post_route_to_vault(train_id, route)
+            except ValueError as error:
+                err(f"Error adding route to vault {data['train_id']}:\n {error}")
+
+                return {"success": False, "msg": "Route could not be added to vault"}, 300
             return msg, 200
         else:
             err(f"Error during build process of train {data['train_id']}:\n {msg}")
             return msg, 300
+
+
 
     elif message["action"] == 'generateHash':
         print("Generating Hash")

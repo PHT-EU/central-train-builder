@@ -67,42 +67,42 @@ class TrainBuilder:
         load_dotenv(dotenv_path=env_path)
 
         client = docker.client.from_env()
-        try:
-            login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
-                                        registry=self.registry_url)
+        # try:
+        login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
+                                    registry=self.registry_url)
             # print(login_result)
-        except Exception as e:
-            print(e)
-            self._cleanup()
-            return {"success": False, "msg": "Docker login error"}
+        # except Exception as e:
+        #     print(e)
+        #     self._cleanup()
+        #     return {"success": False, "msg": "Docker login error"}
 
         # Generate train directory and configuration file before copying to the image
-        try:
-            self.generate_pht_dir(message)
-            self.create_train_config(message["user_id"],
-                                     message["user_public_key"],
-                                     message["user_signature"],
-                                     session_key.hex(),
-                                     message["route"],
-                                     message["train_id"])
+        # try:
+        self.generate_pht_dir(message)
+        self.create_train_config(message["user_id"],
+                                 message["user_public_key"],
+                                 message["user_signature"],
+                                 session_key.hex(),
+                                 message["route"],
+                                 message["train_id"])
 
-            # Generate the dockerfile
-            self.create_temp_dockerfile(message)
-            image, logs = client.images.build(path=self.build_dir)
-            repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}"
-            image.tag(repo, tag="base")
-            # Remove files after image has been built successfully
-            self._cleanup()
-            result = client.images.push(repository=repo,
-                                        tag="base")
-            image.remove()
-            print(result)
-            # TODO remove image after pushing successfully
-            return {"success": True, "msg": "Successfully built train"}
-        except Exception as e:
-            print(e)
-            self._cleanup()
-            return {"success": False, "msg": "Error building train}"}
+        # Generate the dockerfile
+        self.create_temp_dockerfile(message)
+        image, logs = client.images.build(path=self.build_dir)
+        repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}"
+        image.tag(repo, tag="base")
+        # Remove files after image has been built successfully
+        self._cleanup()
+        result = client.images.push(repository=repo,
+                                    tag="base")
+        # client.images.remove(image)
+        print(result)
+        # TODO remove image after pushing successfully
+        return {"success": True, "msg": "Successfully built train"}
+        # except Exception as e:
+        #     print(e)
+        #     self._cleanup()
+        #     return {"success": False, "msg": "Error building train}"}
 
     def _cleanup(self):
         """
@@ -261,7 +261,7 @@ class TrainBuilder:
         encrypted_session_key = {}
         for idx, key in station_public_keys.items():
             pk = self.load_public_key(bytes.fromhex(key))
-            encrypted_key = pk.encrypt(session_key,
+            encrypted_key = pk.encrypt(bytes.fromhex(session_key),
                                        padding.OAEP(
                                            mgf=padding.MGF1(algorithm=hashes.SHA512()),
                                            algorithm=hashes.SHA512(),
@@ -294,8 +294,8 @@ class TrainBuilder:
         vault_url = f"{url}v1/station_pks/{station_id}"
         headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(vault_url, headers=headers)
-        data = r.json()
-        return data["data"]["rsa_public_key"]
+        public_key = r.json()["data"]["data"]["rsa_station_public_key"]
+        return public_key
 
     def get_user_public_key(self, user_id):
         """
@@ -387,7 +387,8 @@ class TrainBuilder:
         hasher = hashes.Hash(hashes.SHA512(), default_backend())
         hasher.update(str(chr(user_id)).encode())
         self.hash_files(hasher, files)
-        hasher.update(bytes(route))
+        for station in route:
+            hasher.update(str.encode(station))
         hasher.update(session_id)
         digest = hasher.finalize()
         self.hash = digest.hex()
