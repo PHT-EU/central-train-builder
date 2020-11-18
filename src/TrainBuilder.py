@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 import json
 from base64 import b64encode
 from src.simulate_webservice import create_json_message
+from src.train_from_image import ImageHandler
 import shutil
 from dotenv import load_dotenv, find_dotenv
 import redis
@@ -29,6 +30,7 @@ class TrainBuilder:
         self.client = None
         # Setup redis and build directory
         self._setup()
+        self.image_handler = ImageHandler(self.client)
 
 
     def build_train(self, web_service_json: dict):

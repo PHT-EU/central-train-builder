@@ -1,2 +1,5 @@
 pandas
 numpy
+flask
+requests
+scikit-learn

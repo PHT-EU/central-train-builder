@@ -77,10 +77,11 @@ class ImageHandler:
         """
         # TODO extract tar archive and generate hash
 
-    def _validate_file_system_changes(self, file_system_diff):
+    def _validate_file_system_changes(self, file_system_diff: List[str]) ->bool:
         add_ind = None
         deleted_ind = None
         changed_ind = None
+        valid = False
         for ind, content in enumerate(file_system_diff):
             if "These entries have been added" in content:
                 add_ind = ind
@@ -88,10 +89,39 @@ class ImageHandler:
                 deleted_ind = ind
             elif "These entries have been changed" in content:
                 changed_ind = ind
-        print(add_ind, deleted_ind, changed_ind)
+        # Find the files added to the image file system and make sure they are located exclusively under /opt/pht_train
+        if len(file_system_diff[add_ind: deleted_ind]) > 2:
+            print("Added files detected.")
+            for file in file_system_diff[add_ind + 2: deleted_ind]:
+                if not self._validate_added_file(file):
+                    valid = False
+                else:
+                    valid = True
+        # If the length of the deleted files section is greater than two, files have been deleted from the master image
+        # -> image invalid
+        if len(file_system_diff[deleted_ind: changed_ind]) > 2:
+            print("Deleted Files detected")
+            valid = False
+        if len(file_system_diff[changed_ind:]) > 2:
+            print("Changed files detected")
+            valid = False
 
-    def _check_added_files(self, files: list) -> bool:
+        if valid:
+            print("Validation success")
+
+        return valid
+
+    @staticmethod
+    def _validate_added_file(file: str) -> bool:
+        # TODO allow more locations for installed interpreter etc
+        path = file.split(" ")[0]
+        if len(path) > 1:
+            if path.split("/")[1:3] != ["opt", "pht_train"]:
+                print(f"Invalid File location found: {path}")
+                return False
         return True
+
+
 
     def _get_image(self, name) -> docker.client.ImageCollection:
         return self.client.images.get(name)
