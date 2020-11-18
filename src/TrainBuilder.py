@@ -23,28 +23,13 @@ class TrainBuilder:
         self.hash = None
         self.registry_url = os.getenv("harbor_url")
         self.session_id = None
-        # Connect to redis either in docker-compose container or on localhost
-        try:
-            self.redis = redis.Redis("redis", decode_responses=True)
-            self.redis.ping()
-        except redis.exceptions.ConnectionError as e:
-            print("Redis container not found, attempting connection on localhost")
-            self.redis = redis.Redis(decode_responses=True)
-            print(self.redis.ping())
+        self.redis = None
         self.build_dir = os.getenv("build_dir")
         self.entrypoint = None
-        if not self.build_dir:
-            self.build_dir = os.path.abspath("./build_dir")
-            if not os.path.isdir("./build_dir"):
-                os.mkdir("./build_dir")
-            else:
-                files = glob.glob(f'{self.build_dir}/*')
-                for f in files:
-                    if os.path.isdir(f):
-                        shutil.rmtree(f)
-                    else:
-                        os.remove(f)
-                # raise ValueError("No build directory specified and default dir already exists")
+        self.client = None
+        # Setup redis and build directory
+        self._setup()
+
 
     def build_train(self, web_service_json: dict):
         """
@@ -78,6 +63,7 @@ class TrainBuilder:
 
         # Generate train directory and configuration file before copying to the image
         # try:
+
         self.generate_pht_dir(message)
         self.create_train_config(message["user_id"],
                                  message["user_public_key"],
@@ -103,6 +89,36 @@ class TrainBuilder:
         #     print(e)
         #     self._cleanup()
         #     return {"success": False, "msg": "Error building train}"}
+
+    def _setup(self):
+        """
+        Setup the directory structure required for building trains and connect to redis server
+
+        :return:
+        """
+        # Make sure the  build directory exists and is empty
+        if not os.path.isdir(self.build_dir):
+            self.build_dir = os.path.abspath("./build_dir")
+            os.mkdir(self.build_dir)
+            if not os.path.isdir("./build_dir"):
+                os.mkdir("./build_dir")
+        else:
+            files = glob.glob(f'{self.build_dir}/*')
+            for f in files:
+                if os.path.isdir(f):
+                    shutil.rmtree(f)
+                else:
+                    os.remove(f)
+        # Connect to redis either in docker-compose container or on localhost
+        try:
+            self.redis = redis.Redis("redis", decode_responses=True)
+            self.redis.ping()
+        except redis.exceptions.ConnectionError as e:
+            print("Redis container not found, attempting connection on localhost")
+            self.redis = redis.Redis(decode_responses=True)
+            print(self.redis.ping())
+        # Setup docker client
+        self.client = docker.client.from_env()
 
     def _cleanup(self):
         """
@@ -202,8 +218,8 @@ class TrainBuilder:
         with open(os.path.join(os.path.abspath(self.build_dir), "Dockerfile"), "w") as df:
             df.write(f"FROM  {web_service_json['master_image']}\n")
             df.write(f"COPY ./pht_train /opt/pht_train\n")
-            df.write(f"RUN mkdir /opt/pht_results")
-            df.write(f'ENTRYPOINT ["python", "/opt/{self.entrypoint}"]')
+            df.write(f"RUN mkdir /opt/pht_results\n")
+            df.write(f'CMD ["python", "/opt/{self.entrypoint}"]')
 
     @staticmethod
     def encrypt_file(fernet: Fernet, file):
@@ -230,6 +246,10 @@ class TrainBuilder:
         station_public_keys = self.get_station_public_keys(route)
         encrypted_session_key = self.encrypt_session_key(session_key, station_public_keys)
         # TODO check types of signatures/keys
+        print()
+        if not self.redis.get(train_id):
+            raise ValueError("Train Hash Value not registered in redis. Has the train been signed?")
+
         keys = {
             "user_id": user_id,
             "train_id": train_id,
@@ -274,8 +294,9 @@ class TrainBuilder:
     def get_station_public_keys(self, route: list):
         """
         Gets the public keys of the stations included in the route from the vault service
+
         :param route: route containing PID of stations
-        :return: dictionary with statino PIDs as keys and the associated public keys as values
+        :return: dictionary with station PIDs as keys and the associated public keys as values
         """
         public_keys = {}
         for station in route:

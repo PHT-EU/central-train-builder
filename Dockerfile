@@ -1,4 +1,4 @@
-FROM python:3.8-slim
+FROM python:3.9-slim-buster
 COPY ./src /home/src
 COPY rsa.public /home/rsa.public
 COPY requirements.txt /home/requirements.txt

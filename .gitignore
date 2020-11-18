@@ -6,3 +6,4 @@ testfile
 /venv
 .env
 /build_dir
+/bin

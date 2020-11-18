@@ -31,6 +31,19 @@ This package requires docker to be installed on the host machine.
 The required python 3 packages can be installed via  `pip install -r requirements.txt`
 Make sure there is a redis instance running and available on `localhost:6379`
 
+### container-diff
+Install the [container-diff](https://github.com/GoogleContainerTools/container-diff) tool and add it to path
+```
+curl -LO https://storage.googleapis.com/container-diff/latest/container-diff-linux-amd64 && chmod +x container-diff-linux-amd64 && sudo mv container-diff-linux-amd64 /usr/local/bin/container-diff
+```
+
+## Testing
+In the test directory run 
+`docker build -t harbor.personalhealthtrain.de/pht_train_submission/test -f Dockerfile_test .` to build an invalid image
+
+
+
+
 ## Configuration/Authentification
 To access harbor and vault, username and password or an authentification token are respectively required. These are read
 by the TrainBuilder from a `.env` file in the projects root directory.

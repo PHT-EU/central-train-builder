@@ -71,10 +71,12 @@ async def build_train(sid, message):
         route = data["route"]
         route = [str(x) for x in route]  # TR requires strings as harborProjects
 
-
         logging.info(f"Building the train, id: {data['train_id']}")
-
-        msg = tb.build_train(data)
+        try:
+            msg = tb.build_train(data)
+        except BaseException as e:
+            err(e)
+            return {"success": False, "msg": "Internal Server error"}, 500
         if msg["success"]:
             logging.info(f"Successfully built train: id {data['train_id']}")
             print(msg)
@@ -125,6 +127,7 @@ async def build_train(sid, message):
         pass
     else:
         return {"success": False, "msg": "Unrecognized command"}, 300
+
 
 # We bind our aiohttp endpoint to our app
 # router
