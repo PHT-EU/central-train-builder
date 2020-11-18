@@ -12,7 +12,7 @@
       "tuebingen",
       "leipzig"
     ],
-    "master_image": "harbor.personalhealthtrain.de/pht_master/python_train:master",
+    "master_image": "harbor.personalhealthtrain.de/pht_master/master:buster",
     "endpoint": {
       "name": "default",
       "command": "run",
