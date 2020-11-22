@@ -1,0 +1,5 @@
+FROM harbor.personalhealthtrain.de/pht_master/master:buster
+COPY ./test_train /opt/pht_train/test_train
+RUN pip install -r /opt/pht_train/test_train/requirements.txt && rm -r /root/.cache
+
+CMD ["python", "/opt/pht_train/test_train/test.py"]

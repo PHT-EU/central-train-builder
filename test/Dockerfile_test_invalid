@@ -1,4 +1,4 @@
 FROM harbor.personalhealthtrain.de/pht_master/master:buster
 COPY ./test_train /home/test_train
-RUN pip install -r /home/test_train/requirements.txt
+RUN pip install -r --no-cache-dir /home/test_train/requirements.txt && rm -r /root/.cache
 CMD ["python", "/home/test_train/test.py"]

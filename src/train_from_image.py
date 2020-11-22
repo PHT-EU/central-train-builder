@@ -1,7 +1,10 @@
+from io import BytesIO
+import tarfile
 import docker
 import subprocess
 import json
 from typing import List, Tuple
+
 
 
 class ImageHandler:
@@ -21,11 +24,12 @@ class ImageHandler:
         submission_img = self._get_image(submission_img_name)
         # Compare image histories
         history_diff = self._compare_image_history(master_img, submission_img)
+        print(history_diff)
         hist_valid = self._validate_history_diff(history_diff)
         # compare image file systems
         if hist_valid:
             code, msg = self._compare_image_file_system(master_img_name, submission_img_name)
-
+            self._extract_immutable_files(submission_img_name)
             if code != 0:
                 return code, msg
             # TODO extract files from /opt/pht_train/ and calculate hash value
@@ -48,7 +52,9 @@ class ImageHandler:
         submission_history = submission_image.history()
         # TODO solve this with set difference maybe
         history_diff = []
+
         for event in submission_history:
+            print(event)
             if event not in master_history:
                 history_diff.append(event["CreatedBy"])
         for master_event in master_history:
@@ -56,14 +62,14 @@ class ImageHandler:
                 print(master_event)
                 if "ENTRYPOINT" in master_event["CreatedBy"]:
                     if not self._validate_entrypoint():
-                        # TODO Check entrypoint
-                        raise ValueError("The submitted Image is not derived from an accepted base image")
+                        raise ValueError("Entrypoint overriding is not allowed")
                 else:
                     raise ValueError("The submitted Image is not derived from an accepted base image")
         return history_diff
 
     def _compare_image_file_system(self, master_image_name: str, submission_image_name: str):
 
+        # TODO check if the correct images get loaded
         container_diff_args = ["container-diff", "diff", f"daemon://{master_image_name}",
                                f"daemon://{submission_image_name}", "--type=file"]
         output = subprocess.run(container_diff_args, capture_output=True)
@@ -72,23 +78,34 @@ class ImageHandler:
         if valid:
             return 0, "No file system anomalies detected"
         else:
-            return 1, "Invalid file system changes detected, files can only be added into" \
+            return 1, "Invalid file system changes detected, files can only be added into " \
                       f"/opt/pht_train, but found {msg}"
 
     def _validate_history_diff(self, history_diff: list) -> bool:
         # TODO is this even needed?
-        return True
+        return False
 
     def _validate_entrypoint(self):
         # TODO
         return True
 
-    def _extract_immutable_files(self):
+    def _extract_immutable_files(self, img: str, path: str = "../build_dir"):
         """
         Extract the files in /opt/pht_train and hash them to get the hash of immutable files
 
-        :return: hex
+        :return: file archive
         """
+        container = self.client.containers.run(img, detach=True)
+        stream, stat = container.get_archive("/opt/pht_train")
+        file_obj = BytesIO()
+        for f in stream:
+            file_obj.write(f)
+        file_obj.seek(0)
+        tar = tarfile.open(mode="r", fileobj=file_obj)
+        tar.extractall(path=path)
+
+    def _get_file_from_container(self, file_path: str):
+        pass
         # TODO extract tar archive and generate hash
 
     def _validate_file_system_changes(self, file_system_diff: List[str]) -> Tuple[bool, str]:
@@ -116,10 +133,16 @@ class ImageHandler:
         # Find the files added to the image file system and make sure they are located exclusively under /opt/pht_train
         if len(file_system_diff[add_ind: deleted_ind]) > 2:
             print("Added files detected.")
+            valid = True
+            invalid_files = []
             for file in file_system_diff[add_ind + 2: deleted_ind]:
-                valid, file = self._validate_added_file(file)
-                if not valid:
-                    return False, f"Incorrectly added files detected: {file} "
+                valid_file, file = self._validate_added_file(file)
+                if not valid_file:
+                    valid = False
+                    invalid_files.append(file)
+            invalid_file_string = "\n".join(invalid_files)
+            if not valid:
+                return False, f"Incorrectly added files:\n{invalid_file_string} "
         # If the length of the deleted files section is greater than two, files have been deleted from the master image
         # -> image invalid
         if len(file_system_diff[deleted_ind: changed_ind]) > 2:
@@ -145,7 +168,6 @@ class ImageHandler:
         """
         path = file.split(" ")[0]
         if len(path) > 1:
-            print(path.split("/")[1:3])
             if path.split("/")[1:3] != ["opt", "pht_train"]:
                 print(f"Invalid File location found: {path}")
                 return False, path
@@ -159,6 +181,6 @@ if __name__ == '__main__':
     client = docker.from_env()
     ih = ImageHandler(client)
     test_message = {"master_image": "harbor.personalhealthtrain.de/pht_master/master:buster",
-                    "proposal_image": "harbor.personalhealthtrain.de/pht_train_submission/test"}
+                    "proposal_image": "harbor.personalhealthtrain.de/pht_train_submission/test_valid"}
 
     print(ih.validate_image(test_message))
