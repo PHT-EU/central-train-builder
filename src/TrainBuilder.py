@@ -219,6 +219,7 @@ class TrainBuilder:
         # TODO change entrypoint based on user input
         with open(os.path.join(os.path.abspath(self.build_dir), "Dockerfile"), "w") as df:
             df.write(f"FROM  {web_service_json['master_image']}\n")
+            df.write("COPY ./train_config.json /opt/train_config.json\n")
             df.write(f"COPY ./pht_train /opt/pht_train\n")
             df.write(f"RUN mkdir /opt/pht_results\n")
             df.write(f'CMD ["python", "/opt/{self.entrypoint}"]')
@@ -265,10 +266,10 @@ class TrainBuilder:
             "e_d_sig": None,
             "digital_signature": None
         }
-        train_dir = os.path.join(self.build_dir, "pht_train")
-        if not os.path.isdir(train_dir):
-            os.mkdir(train_dir)
-        config_file = os.path.join(train_dir, "train_config.json")
+        # train_dir = os.path.join(self.build_dir, "pht_train")
+        # if not os.path.isdir(train_dir):
+        #     os.mkdir(train_dir)
+        config_file = os.path.join(self.build_dir, "train_config.json")
         with open(config_file, "w") as kf:
             print(f"Writing config at {config_file}")
             json.dump(keys, kf, indent=2)
