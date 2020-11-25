@@ -201,7 +201,8 @@ class TrainBuilder:
         try:
             train_hash = self.generate_hash(web_service_json["user_id"], files, route, bytes.fromhex(session_id))
             print("Adding hash to redis")
-            self.redis.set(web_service_json['train_id'], value=self.hash)
+            self.redis.set(f"{web_service_json['train_id']}_hash", value=self.hash)
+            self.redis.set(f"{web_service_json['train_id']}_session_id", value=session_id)
             print(f"Redis Hash value: {self.redis.get(web_service_json['train_id'])}")
             self.hash = None
             return {"success": True, "data": {"hash": train_hash}}
@@ -256,11 +257,11 @@ class TrainBuilder:
         keys = {
             "user_id": user_id,
             "train_id": train_id,
-            "session_id": self._generate_session_id(),
+            "session_id": self.redis.get(f"{train_id}_session_id"),
             "rsa_user_public_key": user_pk,
             "encrypted_key": encrypted_session_key,
             "rsa_public_keys": station_public_keys,
-            "e_h": self.redis.get(train_id),
+            "e_h": self.redis.get(f"{train_id}_hash"),
             "e_h_sig": user_signature,
             "e_d": None,
             "e_d_sig": None,
@@ -270,6 +271,7 @@ class TrainBuilder:
         # if not os.path.isdir(train_dir):
         #     os.mkdir(train_dir)
         config_file = os.path.join(self.build_dir, "train_config.json")
+        print(keys)
         with open(config_file, "w") as kf:
             print(f"Writing config at {config_file}")
             json.dump(keys, kf, indent=2)
@@ -409,10 +411,10 @@ class TrainBuilder:
         :return: hash value to be signed offline by user
         """
         hasher = hashes.Hash(hashes.SHA512(), default_backend())
-        hasher.update(str(chr(user_id)).encode())
+        hasher.update(str(user_id).encode())
         self.hash_files(hasher, files)
-        for station in route:
-            hasher.update(str.encode(station))
+        # for station in route:
+        #     hasher.update(str.encode(station))
         hasher.update(session_id)
         digest = hasher.finalize()
         self.hash = digest.hex()

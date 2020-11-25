@@ -162,10 +162,14 @@ if __name__ == '__main__':
 
     sio.connect('http://localhost:7777')
 
-    with open("../test_message.json", "r") as f:
+    minimal_example_message = "../test_message.json"
+    file_size_message = "../test_message_encryption_test.json"
+    with open(file_size_message, "r") as f:
         msg = json.load(f)
-        print(msg)
 
+    with open("../test/test_train/test.py", "r") as tf:
+        msg["data"]["endpoint"]["files"][0]["content"] = tf.read()
+    print(msg)
     sio.emit("train", msg)
 
     # loop = asyncio.get_event_loop()

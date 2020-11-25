@@ -1,5 +1,5 @@
 {
-  "action": "build",
+  "action": "generateHash",
   "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwibmFtZSI6ImFkbWluIiwiaWF0IjoxNjAzMTA0OTExLCJleHAiOjE2MDU3ODMzMTF9.QOdX9KPNEYh7TRNxRDbtziYNRBEw74crydX5Vt875p5UYCBWnKnjhoIVGpHWyr8Xql1Dj-TPc78UJZn_qYmZ7m5x6FX_qwRWZBmia_4CUzM7eX7UJWwTsfQBwNGK5RFbd6b1tmXilTCaDzbDqPXiKg_NE_htFnHyhC2cXZjdopw",
   "data": {
     "type": "discovery",
