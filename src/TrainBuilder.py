@@ -78,13 +78,17 @@ class TrainBuilder:
         self.create_temp_dockerfile(message)
         image, logs = client.images.build(path=self.build_dir)
         repo = f"harbor.personalhealthtrain.de/pht_incoming/{message['train_id']}"
+        # tag images as base and latest
         image.tag(repo, tag="base")
+        image.tag(repo, tag="latest")
         # Remove files after image has been built successfully
         self._cleanup()
         result = client.images.push(repository=repo,
                                     tag="base")
-        # client.images.remove(image)
-        print(result)
+        result = client.images.push(repository=repo,
+                                    tag="latest")
+
+        client.images.remove(image)
         # TODO remove image after pushing successfully
         return {"success": True, "msg": "Successfully built train"}
 
