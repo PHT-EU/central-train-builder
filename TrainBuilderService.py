@@ -93,8 +93,6 @@ async def build_train(sid, message):
             err(f"Error during build process of train {data['train_id']}:\n {msg}")
             return msg, 300
 
-
-
     elif message["action"] == 'generateHash':
         print("Generating Hash")
         try:

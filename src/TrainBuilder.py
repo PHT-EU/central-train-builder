@@ -219,7 +219,7 @@ class TrainBuilder:
         """
         # TODO change entrypoint based on user input
         with open(os.path.join(os.path.abspath(self.build_dir), "Dockerfile"), "w") as df:
-            df.write(f"FROM  {web_service_json['master_image']}\n")
+            df.write(f"FROM  harbor.personalhealthtrain.de/pht_master/master:{web_service_json['master_image']}\n")
             df.write("COPY ./train_config.json /opt/train_config.json\n")
             df.write(f"COPY ./pht_train /opt/pht_train\n")
             df.write(f"RUN mkdir /opt/pht_results\n")
