@@ -1,8 +1,9 @@
 FROM python:3.9-slim-buster
+COPY requirements.txt /home/requirements.txt
 RUN pip install -r /home/requirements.txt && mkdir /home/build_dir
 COPY ./src /home/src
 COPY rsa.public /home/rsa.public
-COPY requirements.txt /home/requirements.txt
+
 COPY TrainBuilderService.py /home/TrainBuilderService.py
     # TODO add this for building from iamge
 
