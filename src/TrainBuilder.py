@@ -250,8 +250,7 @@ class TrainBuilder:
         station_public_keys = self.get_station_public_keys(route)
         encrypted_session_key = self.encrypt_session_key(session_key, station_public_keys)
         # TODO check types of signatures/keys
-        print()
-        if not self.redis.get(train_id):
+        if not self.redis.get(f"{train_id}_hash"):
             raise ValueError("Train Hash Value not registered in redis. Has the train been signed?")
 
         keys = {
