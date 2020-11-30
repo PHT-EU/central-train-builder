@@ -65,7 +65,7 @@ class TrainBuilder:
 
         # Generate train directory and configuration file before copying to the image
         # try:
-
+        # TODO user the user public key stored in vault
         self.generate_pht_dir(message)
         self.create_train_config(message["user_id"],
                                  message["user_public_key"],
@@ -87,10 +87,6 @@ class TrainBuilder:
         print(result)
         # TODO remove image after pushing successfully
         return {"success": True, "msg": "Successfully built train"}
-        # except Exception as e:
-        #     print(e)
-        #     self._cleanup()
-        #     return {"success": False, "msg": "Error building train}"}
 
     def _setup(self):
         """
@@ -201,6 +197,8 @@ class TrainBuilder:
         try:
             train_hash = self.generate_hash(web_service_json["user_id"], files, route, bytes.fromhex(session_id))
             print("Adding hash to redis")
+            if self.redis.get(f"{web_service_json['train_id']}_hash"):
+                return {"success": False, "msg": f"Duplicate train id: {web_service_json['train_id']}"}
             self.redis.set(f"{web_service_json['train_id']}_hash", value=self.hash)
             self.redis.set(f"{web_service_json['train_id']}_session_id", value=session_id)
             print(f"Redis Hash value: {self.redis.get(web_service_json['train_id'])}")
