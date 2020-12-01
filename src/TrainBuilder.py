@@ -32,7 +32,6 @@ class TrainBuilder:
         self._setup()
         self.image_handler = ImageHandler(self.client)
 
-
     def build_train(self, web_service_json: dict):
         """
         Build a train based on the message sent from the UI, also generates a configuration file containing relevant
@@ -57,7 +56,11 @@ class TrainBuilder:
         # try:
         login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                     registry=self.registry_url)
-            # print(login_result)
+
+        master_img = client.images.pull(repository="harbor.personalhealthtrain.de/pht_master/master",
+                                        tag=web_service_json['master_image'])
+
+        # print(login_result)
         # except Exception as e:
         #     print(e)
         #     self._cleanup()
