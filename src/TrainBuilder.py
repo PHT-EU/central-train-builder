@@ -396,7 +396,7 @@ class TrainBuilder:
             if file['name'] == "entrypoint.py":
                 # Entrypoint path relative to train directory
 
-                self.entrypoint = "/".join(file_path.split("/")[2:])
+                self.entrypoint = "/".join(file_path.split("/")[4:])
                 print("Entrypoint: ", self.entrypoint)
 
             elif file.get("type") == "entrypoint":
