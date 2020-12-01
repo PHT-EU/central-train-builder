@@ -167,7 +167,7 @@ if __name__ == '__main__':
     with open(file_size_message, "r") as f:
         msg = json.load(f)
 
-    with open("../test/test_train/test.py", "r") as tf:
+    with open("../test/test_train/entrypoint.py", "r") as tf:
         msg["data"]["endpoint"]["files"][0]["content"] = tf.read()
     print(msg)
     sio.emit("train", msg)

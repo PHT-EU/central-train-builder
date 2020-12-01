@@ -2,11 +2,6 @@ import os
 import random
 import string
 
-# 20 mb
-FILE_SIZE = 1024 * 1024 * 20
-RESULTS_DIR = "/opt/pht_results"
-FILE_NAME = "test_result.txt"
-
 
 def generate_random_text_file(filename, size):
     """
@@ -15,15 +10,20 @@ def generate_random_text_file(filename, size):
     :param size: the size in bytes
     :return: void
     """
+    print("Generating file...")
     chars = ''.join([random.choice(string.ascii_letters) for i in range(size)])
-    with open(filename, 'w') as file:
+    with open("/opt/pht_results/test_result.txt", 'w') as file:
         file.write(chars)
 
 
 if __name__ == '__main__':
+    # 20 mb
+    FILE_SIZE = 1024 * 1024 * 20
+    RESULTS_DIR = "/opt/pht_results"
+    FILE_NAME = "test_result.txt"
     print(f"Generating a new random file: Size={FILE_SIZE}b")
 
-    generate_random_text_file(os.path.join(RESULTS_DIR, FILE_NAME), FILE_SIZE)
+    generate_random_text_file(os.path.abspath(os.path.join(RESULTS_DIR, FILE_NAME)), FILE_SIZE)
     with open(os.path.join(RESULTS_DIR, FILE_NAME), "r") as f:
         print(f.read(200))
     print("File Generated Successfully")

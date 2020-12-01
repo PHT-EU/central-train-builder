@@ -395,7 +395,8 @@ class TrainBuilder:
             file_path = os.path.join(command_path, file["name"])
             if file['name'] == "entrypoint.py":
                 # Entrypoint path relative to train directory
-                self.entrypoint = "/".join(str(file_path).split("/")[-5:])
+                self.entrypoint = str(file_path)
+                print(self.entrypoint)
             elif file.get("type") == "entrypoint":
                 # TODO entrypoints need to be designated specifically -> Error handling
                 pass
