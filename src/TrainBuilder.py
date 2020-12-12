@@ -13,6 +13,7 @@ import shutil
 from dotenv import load_dotenv, find_dotenv
 import redis
 import glob
+from typing import List
 
 
 class TrainBuilder:
@@ -53,29 +54,22 @@ class TrainBuilder:
         load_dotenv(dotenv_path=env_path)
 
         client = docker.client.from_env()
-        # try:
+
         login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                     registry=self.registry_url)
 
         master_img = client.images.pull(repository="harbor.personalhealthtrain.de/pht_master/master",
                                         tag=web_service_json['master_image'])
 
-        # print(login_result)
-        # except Exception as e:
-        #     print(e)
-        #     self._cleanup()
-        #     return {"success": False, "msg": "Docker login error"}
-
-        # Generate train directory and configuration file before copying to the image
-        # try:
         # TODO user the user public key stored in vault
         self.generate_pht_dir(message)
-        self.create_train_config(message["user_id"],
-                                 message["user_public_key"],
-                                 message["user_signature"],
-                                 session_key.hex(),
-                                 message["route"],
-                                 message["train_id"])
+        self.create_train_config(user_id=message["user_id"],
+                                 user_pk=message["user_public_key"],
+                                 user_signature=message["user_signature"],
+                                 session_key=session_key.hex(),
+                                 route=message["route"],
+                                 train_id=message["train_id"],
+                                 proposal_id=message["proposal_id"])
 
         # Generate the dockerfile
         self.create_temp_dockerfile(message)
@@ -91,7 +85,11 @@ class TrainBuilder:
         result = client.images.push(repository=repo,
                                     tag="latest")
 
-        client.images.remove(image)
+        # Add the label pht_next to the build image
+        self._add_harbor_label(message["train_id"])
+
+        client.images.remove(":".join([repo, "base"]))
+        client.images.remove(":".join([repo, "latest"]))
         # TODO remove image after pushing successfully
         return {"success": True, "msg": "Successfully built train"}
 
@@ -135,67 +133,12 @@ class TrainBuilder:
         if os.path.isdir(os.path.join(self.build_dir, "pht_train")):
             os.rmdir("pht_train")
 
-    # def build_example(self, data):
-    #     """
-    #     Build minimal example
-    #     :param data: The message received from train submission
-    #     :return: success response based on execptions
-    #     """
-    #     endpoints = data["endpoint"]
-    #     files = endpoints["files"]
-    #     file_name = files[0]["name"]
-    #     file_content = files[0]["content"]
-    #
-    #     path = "../"
-    #     file_path = path + file_name
-    #
-    #     train_id = data["train_id"]
-    #     # name = "train_id_" + str(train_id)
-    #     name = str(train_id)
-    #     with open(file_path, "w") as f:
-    #         f.write(file_content)
-    #
-    #     subprocess.Popen(["chmod", "+x", file_path])  # in order to exec
-    #     # master_image = data["master_image"] # Provice Peter with harbor credentials
-    #     master_image = "harbor.personalhealthtrain.de/pht_master/python_train:latest"
-    #     train_path = "/opt/pht_train/endpoints/minimaltrain/commands/run/" + file_name
-    #
-    #     with open("../Dockerfile", "w", encoding='utf-8') as f:
-    #         f.write(f'FROM ' + master_image + '\n')
-    #         f.write(f'COPY {file_path} {train_path}\n')
-    #         f.write(f'ENTRYPOINT ["python", "{train_path}"]')
-    #
-    #     client = docker.client.from_env()
-    #     try:
-    #         login_result = client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
-    #                                     registry=self.registry_url)
-    #         # print(login_result)
-    #     except Exception as e:
-    #         print(e)
-    #         return {"success": False, "msg": "Docker login error"}
-    #
-    #     # todo pull image if not available
-    #     repo = f"harbor.personalhealthtrain.de/pht_incoming/{name}"
-    #     image, logs = client.images.build(path=os.getcwd())
-    #     image.tag(repo, tag="base")  # in order to be processed by train router
-    #     os.remove("../Dockerfile")
-    #     os.remove(file_path)
-    #     # todo remove image afterwards
-    #     try:
-    #         result = client.images.push(repository=repo)
-    #         print(result)
-    #         return {"success": True, "msg": "Successfully built train"}
-    #     except Exception as e:
-    #         print(e)
-    #         return {"success": False, "msg": "Docker push error"}
-
     def provide_hash(self, web_service_json):
         """
         Calculates the hash based on the user provided files and returns it for signing by the user
         :param web_service_json:
         :return:
         """
-        # TODO check this session id for correctness
         session_id = self._generate_session_id()
         self.session_id = session_id
         # files = self._get_files(web_service_json)
@@ -208,12 +151,31 @@ class TrainBuilder:
                 return {"success": False, "msg": f"Duplicate train id: {web_service_json['train_id']}"}
             self.redis.set(f"{web_service_json['train_id']}_hash", value=self.hash)
             self.redis.set(f"{web_service_json['train_id']}_session_id", value=session_id)
-            print(f"Redis Hash value: {self.redis.get(web_service_json['train_id'])}")
             self.hash = None
             return {"success": True, "data": {"hash": train_hash}}
         except BaseException as e:
             print(e)
             return {"success": False, "msg": "Unable to generate Hash"}
+
+    def _add_harbor_label(self, train_id):
+        api = os.getenv("harbor_api")
+        username = os.getenv("harbor_user")
+        password = os.getenv("harbor_pw")
+        url = f'{api}/projects/pht_incoming/repositories/{train_id}/artifacts/latest/labels'
+        print(f'Url for changing the label: {url}')
+
+        # Label being added currently hardcoded
+        # label_added = {'id': 7}  # pht_next id Wissenschaftsnetz
+        label_added = {'id': 2}  # pht_next id de.NBI cloud
+        print(f'Label to be added: {label_added}')
+        headers_add = {'accept': 'application/json', 'Content-Type': 'application/json'}
+
+        response = requests.post(url, headers=headers_add, data=json.dumps(label_added),
+                                 auth=(username, password))
+        response.raise_for_status()
+        print(f'Label with id "{label_added}" has been added.')
+
+
 
     def create_temp_dockerfile(self, web_service_json):
         """
@@ -243,7 +205,8 @@ class TrainBuilder:
         with open(file, "wb") as f:
             f.write(encrypted_file)
 
-    def create_train_config(self, user_id: int, user_pk: str, user_signature, session_key, route, train_id):
+    def create_train_config(self, user_id: int, user_pk: str, user_signature, session_key,
+                            route: List[str], train_id: str, proposal_id: str):
         """
         Creates a keyfile given the values provided by the webservice and stores it in the current working  directory
         :param user_id: id of the user creating the train
@@ -269,7 +232,8 @@ class TrainBuilder:
             "e_h_sig": user_signature,
             "e_d": None,
             "e_d_sig": None,
-            "digital_signature": None
+            "digital_signature": None,
+            "proposal_id": proposal_id
         }
         # train_dir = os.path.join(self.build_dir, "pht_train")
         # if not os.path.isdir(train_dir):
@@ -437,15 +401,3 @@ class TrainBuilder:
         else:
             print("No Hash available yet for the current train")
 
-
-if __name__ == '__main__':
-    tb = TrainBuilder()
-    # keys = tb.get_station_public_keys([1, 2, 3])
-    sym_key = Fernet.generate_key()
-    route = [1, 2, 3]
-    print(tb.encrypt_session_key(sym_key, route))
-    json_message = create_json_message()
-    tb.build_train(json_message)
-    # tb.generate_pht_dir(json.loads(json_message))
-    # keys = tb.create_key_file("123456", )
-    # tb._save_key_file(keys)
