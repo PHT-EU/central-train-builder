@@ -6,3 +6,5 @@ aiohttp
 python-dotenv
 pyjwt
 redis
+pika
+marshmallow

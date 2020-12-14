@@ -13,11 +13,13 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./build_dir:/home/build_dir
+    # TODO change environment variable names to uppercase
     environment:
       - vault_token=<token>
       - vault_url=https://vault.pht.medic.uni-tuebingen.de/
       - harbor_url=https://harbor.personalhealthtrain.de
       - harbor_user=<harbor_user>
+      - harbor_api=https://harbor.personalhealthtrain.de/api/v2.0
       - harbor_pw=<harbor_pw>
       - build_dir=/home/build_dir
       - tb_dir=/home

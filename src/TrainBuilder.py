@@ -6,14 +6,14 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 import json
-from base64 import b64encode
-from src.simulate_webservice import create_json_message
 from src.train_from_image import ImageHandler
 import shutil
 from dotenv import load_dotenv, find_dotenv
 import redis
 import glob
 from typing import List
+from train_lib.client import PHTClient
+import threading
 
 
 class TrainBuilder:
@@ -32,6 +32,9 @@ class TrainBuilder:
         # Setup redis and build directory
         self._setup()
         self.image_handler = ImageHandler(self.client)
+        api_url = os.getenv("UI_TRAIN_API", "http://pht-ui.personalhealthtrain.de/api/pht/trains/")
+        ampq_url = os.getenv("AMQP_URL", None)
+        self.pht_client = PHTClient(api_url=api_url, ampq_url=ampq_url)
 
     def build_train(self, web_service_json: dict):
         """
@@ -174,8 +177,6 @@ class TrainBuilder:
                                  auth=(username, password))
         response.raise_for_status()
         print(f'Label with id "{label_added}" has been added.')
-
-
 
     def create_temp_dockerfile(self, web_service_json):
         """
@@ -400,4 +401,3 @@ class TrainBuilder:
             return self.hash
         else:
             print("No Hash available yet for the current train")
-
