@@ -1,14 +1,21 @@
-import tarfile
 import os
-import redis
+import tarfile
+
 import docker
-import threading
 from train_lib.clients import PHTClient
+from io import BytesIO
+from docker.models.containers import Container
+import json
+from tarfile import TarInfo
+import time
+from dotenv import load_dotenv, find_dotenv
+
 
 
 class RabbitMqBuilder:
 
-    def __init__(self):
+    def __init__(self, pht_client: PHTClient):
+        load_dotenv(find_dotenv())
         self.vault_url = os.getenv("vault_url")
         self.vault_token = os.getenv("vault_token")
         self.registry_url = os.getenv("harbor_url")
@@ -19,29 +26,108 @@ class RabbitMqBuilder:
 
         # Set up Pht client
         # TODO init values
-        self.pht_client = PHTClient()
-
+        self.pht_client = pht_client
 
     def _setup(self):
         # Connect to redis either in docker-compose container or on localhost
-        try:
-            self.redis = redis.Redis("redis", decode_responses=True)
-            self.redis.ping()
-        except redis.exceptions.ConnectionError as e:
-            print("Redis container not found, attempting connection on localhost")
-            self.redis = redis.Redis(decode_responses=True)
-            print(self.redis.ping())
-        # Setup docker client
         self.docker_client = docker.client.from_env()
         login_result = self.docker_client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                                 registry=self.registry_url)
         print(login_result)
 
-    def build_train(self, message):
-        # TODO get message
-        #
+    def build_train(self, build_data: dict, meta_data: dict):
 
-        pass
+        try:
+            docker_file_obj = self._make_dockerfile(
+                master_image=build_data["masterImage"],
+                executable=build_data["entrypointExecutable"],
+                entrypoint_file=build_data["entrypointPath"])
+
+            # Build the image based on the specifications passed in the message
+            image, logs = self.docker_client.images.build(fileobj=docker_file_obj)
+            # Start a temporary container
+            container = self.docker_client.containers.create(image.id)
+            # Generate the train config file
+            config_archive = self._make_train_config(build_data, meta_data)
+            # Add files from API to container
+            self._add_train_files(container, build_data["trainId"], config_archive)
+            print(container)
+            self._tag_and_push_images(container, build_data["trainId"])
+            # Post route to vault to start processing
+            self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
+
+        except Exception as e:
+            print(e)
+            return 1, "error building train"
+
+        return 0, "train successfully built"
 
 
 
+        # publish built event
+
+
+
+    def _add_train_files(self, container: Container, train_id, config_archive):
+        # Get the train files from pht API
+        train_archive = self.pht_client.get_train_files_archive(train_id=train_id)
+        print(train_archive)
+        container.put_archive("/opt/pht_train", train_archive)
+        container.wait()
+        container.put_archive("/opt", config_archive)
+
+    def _make_train_config(self, build_data, meta_data):
+        user_public_key = self.pht_client.get_user_pk(build_data["userId"])
+        station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
+
+        config = {
+            "user_id": build_data["userId"],
+            "train_id": build_data["trainId"],
+            "session_id": build_data["sessionId"],
+            "rsa_user_public_key": user_public_key,
+            "encrypted_key": None,
+            "rsa_public_keys": station_public_keys,
+            "e_h": build_data["hash"],
+            # TODO change this to user Signature
+            "e_h_sig": "test",
+            "e_d": None,
+            "e_d_sig": None,
+            "digital_signature": None,
+            "proposal_id": build_data["proposalId"]
+        }
+
+        print(config)
+        config_archive = BytesIO()
+        tar = tarfile.open(fileobj=config_archive, mode="w")
+        # transform  to bytesIo containing binary json data
+        config = BytesIO(json.dumps(config, indent=2).encode("utf-8"))
+
+        # Create TarInfo Object based on the data
+        config_file = TarInfo(name="train_config.json")
+        config_file.size = config.getbuffer().nbytes
+        config_file.mtime = time.time()
+        # add config data and reset the archive
+        tar.addfile(config_file, config)
+        tar.close()
+        config_archive.seek(0)
+
+        return config_archive
+
+    def _tag_and_push_images(self, container, train_id):
+        repo = f"harbor.personalhealthtrain.de/pht_incoming/{train_id}"
+        container.commit(repo, tag="latest")
+        container.commit(repo, tag="base")
+        push_latest = self.docker_client.images.push(repo, tag="latest")
+        push_base = self.docker_client.images.push(repo, tag="base")
+
+
+    @staticmethod
+    def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
+        docker_file = f'''
+            FROM harbor.personalhealthtrain.de/pht_master/master:{master_image}
+            RUN mkdir /opt/pht_results
+            CMD ["{executable}", "/opt/pht_train/{entrypoint_file}"]
+            '''
+        print(docker_file)
+        file_obj = BytesIO(docker_file.encode("utf-8"))
+        return file_obj

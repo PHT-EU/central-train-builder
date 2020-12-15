@@ -5,41 +5,64 @@ import json
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
+import jwt
+from RabbitMqBuilder import RabbitMqBuilder
 
 
 class TBConsumer(Consumer):
 
-    def __init__(self, amqp_url: str, queue: str = None):
-        super().__init__(amqp_url, queue)
+    def __init__(self, amqp_url: str, queue: str = None, public_key_path: str = None, routing_key: str = None):
+        super().__init__(amqp_url, queue, routing_key=routing_key)
+        load_dotenv(find_dotenv())
         # self.builder = TrainBuilder()
-        self.pht_client = PHTClient(ampq_url=amqp_url, api_url=os.getenv("UI_TRAIN_API"))
+        self.pht_client = PHTClient(ampq_url=amqp_url, api_url=os.getenv("UI_TRAIN_API"),
+                                    vault_url=os.getenv("vault_url"), vault_token=os.getenv("vault_token"))
+        self.builder = RabbitMqBuilder(self.pht_client)
+
+        if public_key_path:
+            with open(public_key_path, "r") as public_key_file:
+                self.pk = public_key_file.read()
+
+        # Set auto reconnect to true
+        self.auto_reconnect = True
+        # Configure routing key
+        self.ROUTING_KEY = "tb"
 
     def on_message(self, _unused_channel, basic_deliver, properties, body):
-        super().on_message(_unused_channel, basic_deliver, properties, body)
 
         message = json.loads(body)
         print(json.dumps(message, indent=2))
+        action, data, meta_data = self._process_message(message)
+        code, build_message = self.builder.build_train(data, meta_data)
+        response = self.make_response(message, code, build_message)
+        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui")
 
-        # self._validate_token(message["token"])
-        # self._process_message(message=message)
+        super().on_message(_unused_channel, basic_deliver, properties, body)
 
-    def _process_message(self, message):
-        pass
+    @staticmethod
+    def _process_message(message):
+        data = message["data"]
+        meta_data = message["metadata"]
+        type = message["type"]
+        return type, data, meta_data
 
-    def _validate_token(self, token):
-        pass
+    def make_response(self, message, code, build_message):
+        if code == 0:
+            message["type"] = "trainBuilt"
+        else:
+            message["type"] = "trainBuildFailed"
+        message["data"]["buildMessage"] = build_message
+
+        return message
 
 
 def main():
-    logging.basicConfig(level=logging.WARNING, format=LOG_FORMAT)
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     AMPQ_URL = 'amqp://pht:start123@193.196.20.19:5672/'
     load_dotenv(find_dotenv())
-    tb_consumer = TBConsumer(AMPQ_URL, "pht-main")
+    tb_consumer = TBConsumer(AMPQ_URL, "pht-tb", routing_key="tb")
     tb_consumer.run()
 
 
 if __name__ == '__main__':
     main()
-
-
-
