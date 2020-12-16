@@ -31,9 +31,15 @@ class TBConsumer(Consumer):
         self.ROUTING_KEY = "tb"
 
     def on_message(self, _unused_channel, basic_deliver, properties, body):
-
-        message = json.loads(body)
-        print(json.dumps(message, indent=2))
+        try:
+            message = json.loads(body)
+            # print(json.dumps(message, indent=2))
+        except:
+            self.pht_client.publish_message_rabbit_mq(
+                {"type": "trainBuildFailed", "data": {"message": "Malformed JSON"}},
+                routing_key="ui")
+            super().on_message(_unused_channel, basic_deliver, properties, body)
+            return
         action, data, meta_data = self._process_message(message)
         if action == "trainBuild":
             LOGGER.info("Received build command")
@@ -43,7 +49,7 @@ class TBConsumer(Consumer):
 
         else:
             LOGGER.warning(f"Received unrecognized action type - {action}")
-            response = self._make_response(f"Unrecognized action type: {action}", code=2)
+            response = self._make_response(message, 1, f"Unrecognized action type: {action}")
 
         self.pht_client.publish_message_rabbit_mq(response, routing_key="ui")
         super().on_message(_unused_channel, basic_deliver, properties, body)
