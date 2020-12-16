@@ -51,7 +51,9 @@ class RabbitMqBuilder:
             container = self.docker_client.containers.create(image.id)
             # Generate the train config file and query
             config_archive = self._make_train_config(build_data, meta_data)
-            query_archive = self._make_query(build_data["query"])
+            query_archive = None
+            if build_data["query"]:
+                query_archive = self._make_query(build_data["query"])
             # Add files from API to container
             self._add_train_files(container, build_data["trainId"], config_archive, query_archive)
             self._tag_and_push_images(container, build_data["trainId"])
@@ -65,7 +67,7 @@ class RabbitMqBuilder:
 
         return 0, "train successfully built"
 
-    def _add_train_files(self, container: Container, train_id, config_archive, query_archive):
+    def _add_train_files(self, container: Container, train_id, config_archive, query_archive=None):
 
         LOGGER.info("Adding train files to container")
         # Get the train files from pht API
@@ -73,7 +75,8 @@ class RabbitMqBuilder:
         container.put_archive("/opt/pht_train", train_archive)
         container.wait()
         container.put_archive("/opt", config_archive)
-        container.put_archive("/opt/pht_train", query_archive)
+        if query_archive:
+            container.put_archive("/opt/pht_train", query_archive)
 
     def _make_train_config(self, build_data, meta_data):
         LOGGER.info("Generating train config")
@@ -88,7 +91,6 @@ class RabbitMqBuilder:
             "encrypted_key": None,
             "rsa_public_keys": station_public_keys,
             "e_h": build_data["hash"],
-            # TODO change this to user Signature
             "e_h_sig": build_data.get("hashSigned", None),
             "e_d": None,
             "e_d_sig": None,
