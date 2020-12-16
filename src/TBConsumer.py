@@ -40,6 +40,7 @@ class TBConsumer(Consumer):
                 routing_key="ui")
             super().on_message(_unused_channel, basic_deliver, properties, body)
             return
+        LOGGER.info(f"Received message: \n {message}")
         action, data, meta_data = self._process_message(message)
         if action == "trainBuild":
             LOGGER.info("Received build command")
