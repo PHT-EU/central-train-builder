@@ -8,6 +8,8 @@ import logging
 import jwt
 from RabbitMqBuilder import RabbitMqBuilder
 
+LOGGER = logging.getLogger(__name__)
+
 
 class TBConsumer(Consumer):
 
@@ -33,20 +35,29 @@ class TBConsumer(Consumer):
         message = json.loads(body)
         print(json.dumps(message, indent=2))
         action, data, meta_data = self._process_message(message)
-        code, build_message = self.builder.build_train(data, meta_data)
-        response = self.make_response(message, code, build_message)
-        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui")
+        if action == "trainBuild":
+            LOGGER.info("Received build command")
 
+            code, build_message = self.builder.build_train(data, meta_data)
+            response = self._make_response(message, code, build_message)
+
+        else:
+            LOGGER.warning(f"Received unrecognized action type - {action}")
+            response = self._make_response(f"Unrecognized action type: {action}", code=2)
+
+        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui")
         super().on_message(_unused_channel, basic_deliver, properties, body)
+
 
     @staticmethod
     def _process_message(message):
         data = message["data"]
         meta_data = message["metadata"]
-        type = message["type"]
-        return type, data, meta_data
+        action = message["type"]
+        return action, data, meta_data
 
-    def make_response(self, message, code, build_message):
+    @staticmethod
+    def _make_response(message, code, build_message):
         if code == 0:
             message["type"] = "trainBuilt"
         else:

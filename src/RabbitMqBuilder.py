@@ -9,7 +9,9 @@ import json
 from tarfile import TarInfo
 import time
 from dotenv import load_dotenv, find_dotenv
+import logging
 
+LOGGER = logging.getLogger(__name__)
 
 
 class RabbitMqBuilder:
@@ -27,13 +29,13 @@ class RabbitMqBuilder:
         # Set up Pht client
         # TODO init values
         self.pht_client = pht_client
+        LOGGER.info("Train Builder setup finished")
 
     def _setup(self):
         # Connect to redis either in docker-compose container or on localhost
         self.docker_client = docker.client.from_env()
         login_result = self.docker_client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                                 registry=self.registry_url)
-        print(login_result)
 
     def build_train(self, build_data: dict, meta_data: dict):
 
@@ -47,36 +49,34 @@ class RabbitMqBuilder:
             image, logs = self.docker_client.images.build(fileobj=docker_file_obj)
             # Start a temporary container
             container = self.docker_client.containers.create(image.id)
-            # Generate the train config file
+            # Generate the train config file and query
             config_archive = self._make_train_config(build_data, meta_data)
+            query_archive = self._make_query(build_data["query"])
             # Add files from API to container
-            self._add_train_files(container, build_data["trainId"], config_archive)
-            print(container)
+            self._add_train_files(container, build_data["trainId"], config_archive, query_archive)
             self._tag_and_push_images(container, build_data["trainId"])
             # Post route to vault to start processing
             self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
+            LOGGER.info(f"Successfully built train - {build_data['trainId']}")
 
         except Exception as e:
-            print(e)
+            LOGGER.error(f"Error building train \n {e}")
             return 1, "error building train"
 
         return 0, "train successfully built"
 
+    def _add_train_files(self, container: Container, train_id, config_archive, query_archive):
 
-
-        # publish built event
-
-
-
-    def _add_train_files(self, container: Container, train_id, config_archive):
+        LOGGER.info("Adding train files to container")
         # Get the train files from pht API
         train_archive = self.pht_client.get_train_files_archive(train_id=train_id)
-        print(train_archive)
         container.put_archive("/opt/pht_train", train_archive)
         container.wait()
         container.put_archive("/opt", config_archive)
+        container.put_archive("/opt/pht_train", query_archive)
 
     def _make_train_config(self, build_data, meta_data):
+        LOGGER.info("Generating train config")
         user_public_key = self.pht_client.get_user_pk(build_data["userId"])
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
 
@@ -89,14 +89,13 @@ class RabbitMqBuilder:
             "rsa_public_keys": station_public_keys,
             "e_h": build_data["hash"],
             # TODO change this to user Signature
-            "e_h_sig": "test",
+            "e_h_sig": build_data.get("hashSigned", None),
             "e_d": None,
             "e_d_sig": None,
             "digital_signature": None,
             "proposal_id": build_data["proposalId"]
         }
 
-        print(config)
         config_archive = BytesIO()
         tar = tarfile.open(fileobj=config_archive, mode="w")
         # transform  to bytesIo containing binary json data
@@ -113,13 +112,25 @@ class RabbitMqBuilder:
 
         return config_archive
 
+    def _make_query(self, query):
+        query = BytesIO(json.dumps(json.loads(query)).encode("utf-8"))
+        query_archive = BytesIO()
+        tar = tarfile.open(fileobj=query_archive, mode="w")
+        query_file = TarInfo(name="train_config.json")
+        query_file.size = query.getbuffer().nbytes
+        query_file.mtime = time.time()
+        tar.addfile(query_file, query)
+        tar.close()
+        query_archive.seek(0)
+
+        return query_archive
+
     def _tag_and_push_images(self, container, train_id):
         repo = f"harbor.personalhealthtrain.de/pht_incoming/{train_id}"
         container.commit(repo, tag="latest")
         container.commit(repo, tag="base")
         push_latest = self.docker_client.images.push(repo, tag="latest")
         push_base = self.docker_client.images.push(repo, tag="base")
-
 
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
@@ -128,6 +139,5 @@ class RabbitMqBuilder:
             RUN mkdir /opt/pht_results
             CMD ["{executable}", "/opt/pht_train/{entrypoint_file}"]
             '''
-        print(docker_file)
         file_obj = BytesIO(docker_file.encode("utf-8"))
         return file_obj
