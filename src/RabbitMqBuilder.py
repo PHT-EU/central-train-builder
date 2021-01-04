@@ -95,7 +95,8 @@ class RabbitMqBuilder:
             "e_d": None,
             "e_d_sig": None,
             "digital_signature": None,
-            "proposal_id": build_data["proposalId"]
+            "proposal_id": build_data["proposalId"],
+            "user_he_key": build_data.get("user_he_key", None)
         }
 
         config_archive = BytesIO()

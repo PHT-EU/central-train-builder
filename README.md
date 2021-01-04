@@ -14,6 +14,8 @@ adding these images to the pht/incoming harbor project and adding the associated
     - harbor_pw=<harbor_pw>
     - build_dir=/home/build_dir
     - tb_dir=/home
+    - UI_TRAIN_API=http://pht-ui.personalhealthtrain.de/api/pht/trains/
+    - AMPQ_URL=<ampq_url>
     ```
 
 2. Build the image and run the services: 
