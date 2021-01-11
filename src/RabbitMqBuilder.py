@@ -134,6 +134,10 @@ class RabbitMqBuilder:
         container.commit(repo, tag="base")
         push_latest = self.docker_client.images.push(repo, tag="latest")
         push_base = self.docker_client.images.push(repo, tag="base")
+        self.docker_client
+        # remove images after building
+        self.docker_client.images.remove(repo + ":base")
+        self.docker_client.images.remove(repo + ":latest")
 
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
