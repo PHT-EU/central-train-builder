@@ -52,7 +52,7 @@ class TBConsumer(Consumer):
             LOGGER.warning(f"Received unrecognized action type - {action}")
             response = self._make_response(message, 1, f"Unrecognized action type: {action}")
 
-        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui")
+        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui.tb")
         super().on_message(_unused_channel, basic_deliver, properties, body)
 
 
