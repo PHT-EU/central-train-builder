@@ -76,7 +76,7 @@ class RabbitMqBuilder:
         container.wait()
         container.put_archive("/opt", config_archive)
         if query_archive:
-            container.put_archive("/opt/pht_train", query_archive)
+            container.put_archive("/opt", query_archive)
 
     def _make_train_config(self, build_data, meta_data):
         LOGGER.info("Generating train config")
