@@ -119,7 +119,7 @@ class RabbitMqBuilder:
         query = BytesIO(json.dumps(json.loads(query)).encode("utf-8"))
         query_archive = BytesIO()
         tar = tarfile.open(fileobj=query_archive, mode="w")
-        query_file = TarInfo(name="train_config.json")
+        query_file = TarInfo(name="query.json")
         query_file.size = query.getbuffer().nbytes
         query_file.mtime = time.time()
         tar.addfile(query_file, query)
