@@ -6,7 +6,7 @@ from train_lib.clients import PHTClient
 from io import BytesIO
 from docker.models.containers import Container
 import json
-from tarfile import TarInfo
+from tarfile import TarInfo, TarFile
 import time
 from dotenv import load_dotenv, find_dotenv
 import logging
@@ -32,12 +32,24 @@ class RabbitMqBuilder:
         LOGGER.info("Train Builder setup finished")
 
     def _setup(self):
+        """
+        Ensure that the docker client has access to the harbor repository
+
+        :return:
+        """
         # Connect to redis either in docker-compose container or on localhost
         self.docker_client = docker.client.from_env()
         login_result = self.docker_client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                                 registry=self.registry_url)
 
     def build_train(self, build_data: dict, meta_data: dict):
+        """
+        Builds the train based two dictionaries containing build and metadata
+
+        :param build_data:
+        :param meta_data:
+        :return:
+        """
 
         try:
             docker_file_obj = self._make_dockerfile(
@@ -68,6 +80,17 @@ class RabbitMqBuilder:
         return 0, "train successfully built"
 
     def _add_train_files(self, container: Container, train_id, config_archive, token, query_archive=None):
+        """
+        Get a tar archive containing uploaded train files from the central service and place them in the
+        specified container. The previously generated config and query files are also added to the container
+
+        :param container: docker Container object to which to add the files
+        :param train_id: id of the train for querying the files from the central server
+        :param config_archive: tar archive containing a json file
+        :param token: token required for accessing the files from the central server
+        :param query_archive: tar archive containing the json definition of a fhir query
+        :return:
+        """
 
         LOGGER.info("Adding train files to container")
         # Get the train files from pht API
@@ -78,7 +101,16 @@ class RabbitMqBuilder:
         if query_archive:
             container.put_archive("/opt", query_archive)
 
-    def _make_train_config(self, build_data, meta_data):
+    def _make_train_config(self, build_data: dict, meta_data: dict):
+        """
+        Generate a tar archive containing a json file train_config.json in which the relevant security values for the
+        train will be stored
+
+        :param build_data: dictionary containing build data sent from the central ui
+        :param meta_data:
+        :return:
+        """
+
         LOGGER.info("Generating train config")
         user_public_key = self.pht_client.get_user_pk(build_data["userId"])
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
@@ -115,7 +147,13 @@ class RabbitMqBuilder:
 
         return config_archive
 
-    def _make_query(self, query):
+    def _make_query(self, query) -> BytesIO:
+        """
+        Create a query archive from the passed query object from the ui
+
+        :param query:
+        :return:
+        """
         query = BytesIO(json.dumps(json.loads(query)).encode("utf-8"))
         query_archive = BytesIO()
         tar = tarfile.open(fileobj=query_archive, mode="w")
@@ -128,13 +166,21 @@ class RabbitMqBuilder:
 
         return query_archive
 
-    def _tag_and_push_images(self, container, train_id):
+    def _tag_and_push_images(self, container: Container, train_id: str):
+        """
+        Gets a previously created container for distribution by committing the passed container object to a base and a
+        latest image identified by the train_id and pushes these images to the pht_incoming repository in harbor.
+
+        :param container:
+        :param train_id:
+        :return:
+        """
+
         repo = f"harbor.personalhealthtrain.de/pht_incoming/{train_id}"
         container.commit(repo, tag="latest")
         container.commit(repo, tag="base")
         push_latest = self.docker_client.images.push(repo, tag="latest")
         push_base = self.docker_client.images.push(repo, tag="base")
-        self.docker_client
         # remove images after building
         self.docker_client.images.remove(repo + ":base")
         self.docker_client.images.remove(repo + ":latest")
