@@ -154,7 +154,7 @@ class RabbitMqBuilder:
         :param query:
         :return:
         """
-        query = BytesIO(json.dumps(json.loads(query)).encode("utf-8"))
+        query = BytesIO(query.encode("utf-8"))
         query_archive = BytesIO()
         tar = tarfile.open(fileobj=query_archive, mode="w")
         query_file = TarInfo(name="query.json")
