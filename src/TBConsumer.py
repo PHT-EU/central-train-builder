@@ -76,8 +76,6 @@ class TBConsumer(Consumer):
 
 def main():
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-
-    load_dotenv(find_dotenv())
     tb_consumer = TBConsumer(os.getenv("AMPQ_URL"), "", routing_key="tb")
     tb_consumer.run()
 

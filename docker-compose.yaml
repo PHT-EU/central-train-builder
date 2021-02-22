@@ -18,4 +18,4 @@ services:
       - build_dir=/home/build_dir
       - tb_dir=/home
       - UI_TRAIN_API=http://pht-ui.personalhealthtrain.de/api/pht/trains/
-      - AMQP_URL=<ampq_url>
+      - AMPQ_URL=<ampq_url>
