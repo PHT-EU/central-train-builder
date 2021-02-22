@@ -78,9 +78,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
     load_dotenv(find_dotenv())
-    AMPQ_URL = "amqp://pht:start123@193.196.20.19:5672/"
-    print(AMPQ_URL)
-    tb_consumer = TBConsumer(AMPQ_URL, "", routing_key="tb")
+    tb_consumer = TBConsumer(os.getenv("AMPQ_URL"), "", routing_key="tb")
     tb_consumer.run()
 
 
