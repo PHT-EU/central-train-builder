@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 
 class TBConsumer(Consumer):
 
-    def __init__(self, amqp_url: str, queue: str = None, public_key_path: str = None, routing_key: str = None):
+    def __init__(self, amqp_url: str, queue: str = "", public_key_path: str = None, routing_key: str = None):
         super().__init__(amqp_url, queue, routing_key=routing_key)
         load_dotenv(find_dotenv())
         # self.builder = TrainBuilder()
@@ -52,8 +52,28 @@ class TBConsumer(Consumer):
             LOGGER.warning(f"Received unrecognized action type - {action}")
             response = self._make_response(message, 1, f"Unrecognized action type: {action}")
 
+        # Post updates for tr to get the route from vault
+        self.post_message_for_train_router(data)
+        # Notify the UI that the train has been built
         self.pht_client.publish_message_rabbit_mq(response, routing_key="ui.tb")
         super().on_message(_unused_channel, basic_deliver, properties, body)
+
+
+    def post_message_for_train_router(self, data: dict):
+        """
+        Notifies the train router via RabbitMQ that the train has been built and the route is stored in vault
+
+        :param data: build data for the train
+        :return:
+        """
+        message = {
+            "type": "TRAIN_BUILT",
+            "data": {
+                "trainId": data["trainId"]
+            }
+        }
+        self.pht_client.publish_message_rabbit_mq(json.dumps(message), routing_key="tr.harbor")
+
 
 
     @staticmethod
@@ -75,6 +95,7 @@ class TBConsumer(Consumer):
 
 
 def main():
+    load_dotenv(find_dotenv())
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     tb_consumer = TBConsumer(os.getenv("AMPQ_URL"), "", routing_key="tb")
     tb_consumer.run()
