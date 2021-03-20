@@ -7,6 +7,7 @@ import os
 import logging
 import jwt
 from RabbitMqBuilder import RabbitMqBuilder
+from pprint import pprint
 
 LOGGER = logging.getLogger(__name__)
 
@@ -15,10 +16,13 @@ class TBConsumer(Consumer):
 
     def __init__(self, amqp_url: str, queue: str = "", public_key_path: str = None, routing_key: str = None):
         super().__init__(amqp_url, queue, routing_key=routing_key)
-        load_dotenv(find_dotenv())
+        # load_dotenv(find_dotenv())
         # self.builder = TrainBuilder()
         self.pht_client = PHTClient(ampq_url=amqp_url, api_url=os.getenv("UI_TRAIN_API"),
                                     vault_url=os.getenv("vault_url"), vault_token=os.getenv("vault_token"))
+
+        print(os.getenv("UI_TRAIN_API"))
+
         self.builder = RabbitMqBuilder(self.pht_client)
 
         if public_key_path:
@@ -42,6 +46,7 @@ class TBConsumer(Consumer):
             return
         LOGGER.info(f"Received message: \n {message}")
         action, data, meta_data = self._process_message(message)
+
         if action == "trainBuild":
             LOGGER.info("Received build command")
 
@@ -72,8 +77,8 @@ class TBConsumer(Consumer):
                 "trainId": data["trainId"]
             }
         }
-        self.pht_client.publish_message_rabbit_mq(json.dumps(message), routing_key="tr.harbor")
 
+        self.pht_client.publish_message_rabbit_mq(message, routing_key="tr.harbor")
 
 
     @staticmethod
@@ -96,8 +101,11 @@ class TBConsumer(Consumer):
 
 def main():
     load_dotenv(find_dotenv())
+    print(os.getenv("UI_TRAIN_API"))
+    print(os.getenv("vault_url"))
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     tb_consumer = TBConsumer(os.getenv("AMPQ_URL"), "", routing_key="tb")
+    os.getenv("UI_TRAIN_API")
     tb_consumer.run()
 
 

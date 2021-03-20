@@ -11,6 +11,7 @@ import time
 from dotenv import load_dotenv, find_dotenv
 import logging
 
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -51,31 +52,32 @@ class RabbitMqBuilder:
         :return:
         """
 
-        try:
-            docker_file_obj = self._make_dockerfile(
-                master_image=build_data["masterImage"],
-                executable=build_data["entrypointExecutable"],
-                entrypoint_file=build_data["entrypointPath"])
+        # try:
+        docker_file_obj = self._make_dockerfile(
+            master_image=build_data["masterImage"],
+            executable=build_data["entrypointExecutable"],
+            entrypoint_file=build_data["entrypointPath"])
 
-            # Build the image based on the specifications passed in the message
-            image, logs = self.docker_client.images.build(fileobj=docker_file_obj)
-            # Start a temporary container
-            container = self.docker_client.containers.create(image.id)
-            # Generate the train config file and query
-            config_archive = self._make_train_config(build_data, meta_data)
-            query_archive = None
-            if build_data["query"]:
-                query_archive = self._make_query(build_data["query"])
-            # Add files from API to container
-            self._add_train_files(container, build_data["trainId"], config_archive, meta_data["token"], query_archive)
-            self._tag_and_push_images(container, build_data["trainId"])
-            # Post route to vault to start processing
-            self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
-            LOGGER.info(f"Successfully built train - {build_data['trainId']}")
+        # Build the image based on the specifications passed in the message
+        image, logs = self.docker_client.images.build(fileobj=docker_file_obj)
+        # Start a temporary container
+        container = self.docker_client.containers.create(image.id)
+        # Generate the train config file and query
+        config_archive = self._make_train_config(build_data, meta_data)
+        query_archive = None
 
-        except Exception as e:
-            LOGGER.error(f"Error building train \n {e}")
-            return 1, "error building train"
+        if build_data["query"]:
+            query_archive = self._make_query(build_data["query"])
+        # Add files from API to container
+        self._add_train_files(container, build_data["trainId"], config_archive, meta_data["token"], query_archive)
+        self._tag_and_push_images(container, build_data["trainId"])
+        # Post route to vault to start processing
+        self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
+        LOGGER.info(f"Successfully built train - {build_data['trainId']}")
+
+        # except Exception as e:
+        #     LOGGER.error(f"Error building train \n {e}")
+        #     return 1, "error building train"
 
         return 0, "train successfully built"
 
@@ -95,6 +97,7 @@ class RabbitMqBuilder:
         LOGGER.info("Adding train files to container")
         # Get the train files from pht API
         train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=token)
+        print(train_archive)
         container.put_archive("/opt/pht_train", train_archive)
         container.wait()
         container.put_archive("/opt", config_archive)
@@ -178,6 +181,7 @@ class RabbitMqBuilder:
         """
 
         repo = f"harbor.personalhealthtrain.de/pht_incoming/{train_id}"
+        LOGGER.info(f"Pushing images to {repo}")
         container.commit(repo, tag="latest")
         container.commit(repo, tag="base")
         push_latest = self.docker_client.images.push(repo, tag="latest")
@@ -185,6 +189,7 @@ class RabbitMqBuilder:
         # remove images after building
         self.docker_client.images.remove(repo + ":base")
         self.docker_client.images.remove(repo + ":latest")
+
 
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
