@@ -72,6 +72,7 @@ class RabbitMqBuilder:
         self._add_train_files(container, build_data["trainId"], config_archive, meta_data["token"], query_archive)
         self._tag_and_push_images(container, build_data["trainId"])
         # Post route to vault to start processing
+        print("build data: ", build_data)
         self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
         LOGGER.info(f"Successfully built train - {build_data['trainId']}")
 
@@ -97,7 +98,6 @@ class RabbitMqBuilder:
         LOGGER.info("Adding train files to container")
         # Get the train files from pht API
         train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=token)
-        print(train_archive)
         container.put_archive("/opt/pht_train", train_archive)
         container.wait()
         container.put_archive("/opt", config_archive)

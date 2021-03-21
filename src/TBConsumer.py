@@ -21,8 +21,6 @@ class TBConsumer(Consumer):
         self.pht_client = PHTClient(ampq_url=amqp_url, api_url=os.getenv("UI_TRAIN_API"),
                                     vault_url=os.getenv("vault_url"), vault_token=os.getenv("vault_token"))
 
-        print(os.getenv("UI_TRAIN_API"))
-
         self.builder = RabbitMqBuilder(self.pht_client)
 
         if public_key_path:
@@ -49,7 +47,8 @@ class TBConsumer(Consumer):
 
         if action == "trainBuild":
             LOGGER.info("Received build command")
-
+            # Post updates for tr to get the route from vault
+            self.post_message_for_train_router(data)
             code, build_message = self.builder.build_train(data, meta_data)
             response = self._make_response(message, code, build_message)
 
@@ -57,10 +56,10 @@ class TBConsumer(Consumer):
             LOGGER.warning(f"Received unrecognized action type - {action}")
             response = self._make_response(message, 1, f"Unrecognized action type: {action}")
 
-        # Post updates for tr to get the route from vault
-        self.post_message_for_train_router(data)
+
+
         # Notify the UI that the train has been built
-        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui.tb")
+        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui.tb.events")
         super().on_message(_unused_channel, basic_deliver, properties, body)
 
 
@@ -97,7 +96,6 @@ class TBConsumer(Consumer):
         message["data"]["buildMessage"] = build_message
 
         return message
-
 
 def main():
     load_dotenv(find_dotenv())
