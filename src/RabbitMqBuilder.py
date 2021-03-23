@@ -187,8 +187,8 @@ class RabbitMqBuilder:
         push_latest = self.docker_client.images.push(repo, tag="latest")
         push_base = self.docker_client.images.push(repo, tag="base")
         # remove images after building
-        self.docker_client.images.remove(repo + ":base")
-        self.docker_client.images.remove(repo + ":latest")
+        self.docker_client.images.remove(repo + ":base", noprune=False)
+        self.docker_client.images.remove(repo + ":latest", noprune=False)
 
 
     @staticmethod
