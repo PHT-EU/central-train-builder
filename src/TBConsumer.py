@@ -57,7 +57,7 @@ class TBConsumer(Consumer):
             response = self._make_response(message, 1, f"Unrecognized action type: {action}")
 
         # Notify the UI that the train has been built
-        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui.tb.events")
+        self.pht_client.publish_message_rabbit_mq(response, routing_key="ui.tb.event")
         super().on_message(_unused_channel, basic_deliver, properties, body)
 
     def post_message_for_train_router(self, data: dict):
