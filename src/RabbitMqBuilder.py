@@ -180,7 +180,7 @@ class RabbitMqBuilder:
         :return:
         """
 
-        repo = f"harbor.personalhealthtrain.de/pht_incoming/{train_id}"
+        repo = f"harbor.pht.medic.uni-tuebingen.de/pht_incoming/{train_id}"
         LOGGER.info(f"Pushing images to {repo}")
         container.commit(repo, tag="latest")
         container.commit(repo, tag="base")
@@ -194,7 +194,7 @@ class RabbitMqBuilder:
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
         docker_file = f'''
-            FROM harbor.personalhealthtrain.de/pht_master/master:{master_image}
+            FROM harbor.pht.medic.uni-tuebingen.de/pht_master/master:{master_image}
             RUN mkdir /opt/pht_results
             CMD ["{executable}", "/opt/pht_train/{entrypoint_file}"]
             '''
