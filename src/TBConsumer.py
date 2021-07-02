@@ -9,6 +9,7 @@ import jwt
 from RabbitMqBuilder import RabbitMqBuilder
 from pprint import pprint
 
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -27,7 +28,7 @@ class TBConsumer(Consumer):
             with open(public_key_path, "r") as public_key_file:
                 self.pk = public_key_file.read()
 
-        # Set auto reconnect to true
+        # Set auto reconnect to tr
         self.auto_reconnect = True
         # Configure routing key
         self.ROUTING_KEY = "tb"

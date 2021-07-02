@@ -17,7 +17,7 @@ services:
       - harbor_pw=<harbor_pw>
       - build_dir=/home/build_dir
       - tb_dir=/home
-      - UI_TRAIN_API=http://pht-ui.personalhealthtrain.de/api/pht/trains/
+      - UI_TRAIN_API=http://pht-ui.personalhealthtrain.de/api/trains/
       - AMPQ_URL=<ampq_url>
 
   vault:

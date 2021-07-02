@@ -7,7 +7,7 @@
   },
   "backend": {
     "file": {
-      "path": "/vault/file"
+      "path": "/file"
     }
   },
   "default_lease_ttl": "168h",

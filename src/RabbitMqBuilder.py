@@ -2,6 +2,7 @@ import os
 import tarfile
 
 import docker
+import requests
 from train_lib.clients import PHTClient
 from io import BytesIO
 from docker.models.containers import Container
@@ -11,9 +12,7 @@ import time
 from dotenv import load_dotenv, find_dotenv
 import logging
 
-
 LOGGER = logging.getLogger(__name__)
-
 
 class RabbitMqBuilder:
 
@@ -26,6 +25,7 @@ class RabbitMqBuilder:
         self.docker_client = None
         # Setup redis and docker client
         self._setup()
+        self.service_key = None
 
         # Set up Pht client
         # TODO init values
@@ -42,6 +42,7 @@ class RabbitMqBuilder:
         self.docker_client = docker.client.from_env()
         login_result = self.docker_client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
                                                 registry=self.registry_url)
+        # TODO register service key
 
     def build_train(self, build_data: dict, meta_data: dict):
         """
@@ -151,7 +152,8 @@ class RabbitMqBuilder:
 
         return config_archive
 
-    def _make_query(self, query) -> BytesIO:
+    @staticmethod
+    def _make_query(query) -> BytesIO:
         """
         Create a query archive from the passed query object from the ui
 
@@ -190,13 +192,29 @@ class RabbitMqBuilder:
         self.docker_client.images.remove(repo + ":base", noprune=False)
         self.docker_client.images.remove(repo + ":latest", noprune=False)
 
-
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
         docker_file = f'''
             FROM harbor.pht.medic.uni-tuebingen.de/pht_master/master:{master_image}
             RUN mkdir /opt/pht_results
+            RUN chmod -R +x /opt/pht_train
             CMD ["{executable}", "/opt/pht_train/{entrypoint_file}"]
             '''
         file_obj = BytesIO(docker_file.encode("utf-8"))
+
         return file_obj
+
+    def _get_service_token(self):
+        vault_token = os.getenv("vault_token")
+        vault_url = os.getenv("VAULT_URL")
+        url = vault_url + "/v1/services/TRAIN_BUILDER"
+        headers = {"X-Vault-Token": vault_token}
+        r = requests.get(url=url, headers=headers)
+        print(r.json())
+        r.raise_for_status()
+
+        token = r.json()["data"]["TRAIN_BUILDER"]["clientSecret"]
+        self.service_key = token
+
+
+
