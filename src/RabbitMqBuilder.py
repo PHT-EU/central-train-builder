@@ -12,6 +12,7 @@ import time
 from dotenv import load_dotenv, find_dotenv
 import logging
 
+
 LOGGER = logging.getLogger(__name__)
 
 class RabbitMqBuilder:
@@ -27,8 +28,9 @@ class RabbitMqBuilder:
         self._setup()
         self.service_key = None
 
+        assert self.vault_url and self.vault_token and self.registry_url
+
         # Set up Pht client
-        # TODO init values
         self.pht_client = pht_client
         LOGGER.info("Train Builder setup finished")
 
@@ -70,7 +72,7 @@ class RabbitMqBuilder:
         if build_data["query"]:
             query_archive = self._make_query(build_data["query"])
         # Add files from API to container
-        self._add_train_files(container, build_data["trainId"], config_archive, meta_data["token"], query_archive)
+        self._add_train_files(container, build_data["trainId"], config_archive, query_archive)
         self._tag_and_push_images(container, build_data["trainId"])
         # Post route to vault to start processing
         print("build data: ", build_data)
@@ -98,7 +100,7 @@ class RabbitMqBuilder:
 
         LOGGER.info("Adding train files to container")
         # Get the train files from pht API
-        train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=token)
+        train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=self.service_key)
         container.put_archive("/opt/pht_train", train_archive)
         container.wait()
         container.put_archive("/opt", config_archive)
@@ -207,14 +209,19 @@ class RabbitMqBuilder:
     def _get_service_token(self):
         vault_token = os.getenv("vault_token")
         vault_url = os.getenv("VAULT_URL")
-        url = vault_url + "/v1/services/TRAIN_BUILDER"
+        url = vault_url + "/v1/services/data/TRAIN_BUILDER"
         headers = {"X-Vault-Token": vault_token}
         r = requests.get(url=url, headers=headers)
         print(r.json())
         r.raise_for_status()
 
-        token = r.json()["data"]["TRAIN_BUILDER"]["clientSecret"]
+        token = r.json()["data"]["data"]["clientSecret"]
         self.service_key = token
 
 
+if __name__ == '__main__':
+    load_dotenv(find_dotenv())
+    client = PHTClient(api_url="http://pht-ui.personalhealthtrain.de/api/pht/trains/")
+    builder = RabbitMqBuilder(pht_client=client)
+    builder._get_service_token()
 
