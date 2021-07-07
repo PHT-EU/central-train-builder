@@ -8,30 +8,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./build_dir:/home/build_dir
     # TODO change environment variable names to uppercase
-    environment:
-      - vault_token=<token>
-      - vault_url=https://vault.pht.medic.uni-tuebingen.de/
-      - harbor_url=https://harbor.personalhealthtrain.de
-      - harbor_user=graf
-      - harbor_api=https://harbor.personalhealthtrain.de/api/v2.0
-      - harbor_pw=<harbor_pw>
-      - build_dir=/home/build_dir
-      - tb_dir=/home
-      - UI_TRAIN_API=http://pht-ui.personalhealthtrain.de/api/trains/
-      - AMPQ_URL=<ampq_url>
-
-  vault:
-    image: vault:latest
-    volumes:
-      - ./vault/config:/vault/config
-      - ./vault/policies:/vault/policies
-      - ./vault/data:/vault/data
-    ports:
-      - 8200:8200
-    environment:
-      - VAULT_ADDR=http://0.0.0.0:8200
-      - VAULT_API_ADDR=http://0.0.0.0:8200
-      - VAULT_ADDRESS=http://0.0.0.0:8200
-    cap_add:
-      - IPC_LOCK
-    command: vault server -config=/vault/config/vault.json
+#    environment:
+#      - vault_token=<token>
+#      - vault_url=https://vault.pht.medic.uni-tuebingen.de/
+#      - harbor_url=https://harbor.personalhealthtrain.de
+#      - harbor_user=graf
+#      - harbor_api=https://harbor.personalhealthtrain.de/api/v2.0
+#      - harbor_pw=<harbor_pw>
+#      - build_dir=/home/build_dir
+#      - tb_dir=/home
+#      - UI_TRAIN_API=http://pht-ui.personalhealthtrain.de/api/trains/
+#      - AMPQ_URL=<ampq_url>
+    env_file:
+      - .env
