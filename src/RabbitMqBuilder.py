@@ -12,8 +12,8 @@ import time
 from dotenv import load_dotenv, find_dotenv
 import logging
 
-
 LOGGER = logging.getLogger(__name__)
+
 
 class RabbitMqBuilder:
 
@@ -100,7 +100,8 @@ class RabbitMqBuilder:
 
         LOGGER.info("Adding train files to container")
         # Get the train files from pht API
-        train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=self.service_key)
+        train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=self.service_key,
+                                                                client_id="TRAIN_BUILDER")
         container.put_archive("/opt/pht_train", train_archive)
         container.wait()
         container.put_archive("/opt", config_archive)
@@ -224,4 +225,3 @@ if __name__ == '__main__':
     client = PHTClient(api_url="http://pht-ui.personalhealthtrain.de/api/pht/trains/")
     builder = RabbitMqBuilder(pht_client=client)
     builder._get_service_token()
-

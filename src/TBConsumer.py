@@ -97,8 +97,6 @@ class TBConsumer(Consumer):
 
 def main():
     load_dotenv(find_dotenv())
-    print(os.getenv("UI_TRAIN_API"))
-    print(os.getenv("vault_url"))
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     tb_consumer = TBConsumer(os.getenv("AMPQ_URL"), "", routing_key="tb")
     os.getenv("UI_TRAIN_API")
