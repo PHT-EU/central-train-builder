@@ -19,14 +19,15 @@ class RabbitMqBuilder:
 
     def __init__(self, pht_client: PHTClient):
         load_dotenv(find_dotenv())
-        self.vault_url = os.getenv("vault_url")
-        self.vault_token = os.getenv("vault_token")
-        self.registry_url = os.getenv("harbor_url")
+        self.vault_url = os.getenv("VAULT_URL")
+        self.vault_token = os.getenv("VAULT_TOKEN")
+        self.registry_url = os.getenv("HARBOR_URL")
         self.redis = None
         self.docker_client = None
         # Setup redis and docker client
-        self._setup()
         self.service_key = None
+        self.client_id = None
+        self._setup()
 
         assert self.vault_url and self.vault_token and self.registry_url
 
@@ -42,9 +43,9 @@ class RabbitMqBuilder:
         """
         # Connect to redis either in docker-compose container or on localhost
         self.docker_client = docker.client.from_env()
-        login_result = self.docker_client.login(username=os.getenv("harbor_user"), password=os.getenv("harbor_pw"),
+        login_result = self.docker_client.login(username=os.getenv("HARBOR_USER"), password=os.getenv("HARBOR_PW"),
                                                 registry=self.registry_url)
-        # TODO register service key
+        self._get_service_token()
 
     def build_train(self, build_data: dict, meta_data: dict):
         """
@@ -101,7 +102,7 @@ class RabbitMqBuilder:
         LOGGER.info("Adding train files to container")
         # Get the train files from pht API
         train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=self.service_key,
-                                                                client_id="TRAIN_BUILDER")
+                                                                client_id=self.client_id)
         container.put_archive("/opt/pht_train", train_archive)
         container.wait()
         container.put_archive("/opt", config_archive)
@@ -197,9 +198,12 @@ class RabbitMqBuilder:
 
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
+        registry = os.getenv("harbor_url").split("//")[-1]
+
         docker_file = f'''
-            FROM harbor.pht.medic.uni-tuebingen.de/pht_master/master:{master_image}
+            FROM {registry}/master/{master_image}
             RUN mkdir /opt/pht_results
+            RUN mkdir /opt/pht_train
             RUN chmod -R +x /opt/pht_train
             CMD ["{executable}", "/opt/pht_train/{entrypoint_file}"]
             '''
@@ -208,20 +212,20 @@ class RabbitMqBuilder:
         return file_obj
 
     def _get_service_token(self):
-        vault_token = os.getenv("vault_token")
+        vault_token = os.getenv("VAULT_TOKEN")
         vault_url = os.getenv("VAULT_URL")
-        url = vault_url + "/v1/services/data/TRAIN_BUILDER"
+        url = vault_url + "v1/services/TRAIN_BUILDER"
         headers = {"X-Vault-Token": vault_token}
         r = requests.get(url=url, headers=headers)
-        print(r.json())
         r.raise_for_status()
 
-        token = r.json()["data"]["data"]["clientSecret"]
-        self.service_key = token
+        client_data = r.json()["data"]
+        self.service_key = client_data["clientSecret"]
+        self.client_id = client_data["clientId"]
 
 
 if __name__ == '__main__':
     load_dotenv(find_dotenv())
-    client = PHTClient(api_url="http://pht-ui.personalhealthtrain.de/api/pht/trains/")
+    client = PHTClient(api_url="https://pht.tada5hi.net/api/pht/trains/")
     builder = RabbitMqBuilder(pht_client=client)
     builder._get_service_token()
