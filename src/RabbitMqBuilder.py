@@ -186,7 +186,8 @@ class RabbitMqBuilder:
         :return:
         """
 
-        repo = f"harbor.pht.medic.uni-tuebingen.de/pht_incoming/{train_id}"
+        registry = os.getenv("HARBOR_URL").split("//")[-1]
+        repo = f"{registry}/pht_incoming/{train_id}"
         LOGGER.info(f"Pushing images to {repo}")
         container.commit(repo, tag="latest")
         container.commit(repo, tag="base")
@@ -198,7 +199,7 @@ class RabbitMqBuilder:
 
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
-        registry = os.getenv("harbor_url").split("//")[-1]
+        registry = os.getenv("HARBOR_URL").split("//")[-1]
 
         docker_file = f'''
             FROM {registry}/master/{master_image}
