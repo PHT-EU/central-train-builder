@@ -20,7 +20,7 @@ class TBConsumer(Consumer):
         # load_dotenv(find_dotenv())
         # self.builder = TrainBuilder()
         self.pht_client = PHTClient(ampq_url=amqp_url, api_url=os.getenv("UI_TRAIN_API"),
-                                    vault_url=os.getenv("vault_url"), vault_token=os.getenv("vault_token"))
+                                    vault_url=os.getenv("VAULT_URL"), vault_token=os.getenv("VAULT_TOKEN"))
 
         self.builder = RabbitMqBuilder(self.pht_client)
 
@@ -99,7 +99,7 @@ def main():
     load_dotenv(find_dotenv())
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     tb_consumer = TBConsumer(os.getenv("AMPQ_URL"), "", routing_key="tb")
-    os.getenv("UI_TRAIN_API")
+    # os.getenv("UI_TRAIN_API")
     tb_consumer.run()
 
 
