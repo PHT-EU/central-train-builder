@@ -1,4 +1,10 @@
-FROM python:3.8-buster
+FROM ubuntu
+MAINTAINER michael.graf@uni-tuebingen.de
+# update python version and replace python with python 3
+RUN apt -y update && apt-get -y install software-properties-common
+RUN add-apt-repository ppa:deadsnakes/ppa && apt -y update && apt -y install git
+RUN apt-get install -y python3.8 && apt install python-is-python3 && apt install -y python3-pip
+
 COPY requirements.txt /home/requirements.txt
 RUN pip install -r /home/requirements.txt && mkdir /home/build_dir
 RUN pip install git+https://gitlab.com/PersonalHealthTrain/implementations/germanmii/difuture/train-container-library.git

@@ -1,10 +1,7 @@
 cryptography
 docker
 requests
-python-socketio
-aiohttp
 python-dotenv
 pyjwt
 redis
 pika
-marshmallow
