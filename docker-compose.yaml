@@ -6,6 +6,5 @@ services:
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./build_dir:/home/build_dir
     env_file:
       - .env
