@@ -202,7 +202,7 @@ class RabbitMqBuilder:
         registry = os.getenv("HARBOR_URL").split("//")[-1]
 
         docker_file = f'''
-            FROM {registry}/master/{master_image}
+            FROM {registry}/{master_image}
             RUN mkdir /opt/pht_results
             RUN mkdir /opt/pht_train
             RUN chmod -R +x /opt/pht_train
