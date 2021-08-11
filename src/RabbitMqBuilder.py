@@ -121,8 +121,11 @@ class RabbitMqBuilder:
         LOGGER.info("Generating train config")
         user_public_key = self.pht_client.get_user_pk(build_data["userId"])
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
+        registry = os.getenv("HARBOR_URL").split("//")[-1]
+        master_image = f"{registry}/{build_data['masterImage']}"
 
         config = {
+            "master_image": master_image,
             "user_id": build_data["userId"],
             "train_id": build_data["trainId"],
             "session_id": build_data["sessionId"],
