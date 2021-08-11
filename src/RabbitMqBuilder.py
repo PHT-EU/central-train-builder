@@ -67,11 +67,15 @@ class RabbitMqBuilder:
         # Start a temporary container
         container = self.docker_client.containers.create(image.id)
         # Generate the train config file and query
-        config_archive = self._make_train_config(build_data, meta_data)
+
         query_archive = None
 
         if build_data["query"]:
             query_archive = self._make_query(build_data["query"])
+        if query_archive:
+            immutable_files = build_data["files"] + ["./query.json"]
+            build_data["files"] = immutable_files
+        config_archive = self._make_train_config(build_data, meta_data)
         # Add files from API to container
         self._add_train_files(container, build_data["trainId"], config_archive, query_archive)
         self._tag_and_push_images(container, build_data["trainId"])
