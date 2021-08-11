@@ -86,7 +86,7 @@ class RabbitMqBuilder:
 
         return 0, "train successfully built"
 
-    def _add_train_files(self, container: Container, train_id, config_archive, token, query_archive=None):
+    def _add_train_files(self, container: Container, train_id, config_archive, query_archive=None):
         """
         Get a tar archive containing uploaded train files from the central service and place them in the
         specified container. The previously generated config and query files are also added to the container
@@ -94,7 +94,6 @@ class RabbitMqBuilder:
         :param container: docker Container object to which to add the files
         :param train_id: id of the train for querying the files from the central server
         :param config_archive: tar archive containing a json file
-        :param token: token required for accessing the files from the central server
         :param query_archive: tar archive containing the json definition of a fhir query
         :return:
         """
