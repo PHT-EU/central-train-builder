@@ -7,7 +7,7 @@ RUN apt-get install -y python3.8 && apt install python-is-python3 && apt install
 
 COPY requirements.txt /home/requirements.txt
 RUN pip install -r /home/requirements.txt && mkdir /home/build_dir
-RUN pip install git+https://gitlab.com/PersonalHealthTrain/implementations/germanmii/difuture/train-container-library.git
+RUN pip install git+https://gitlab.com/PersonalHealthTrain/implementations/germanmii/difuture/library/train-container-library.git
 COPY ./src /home/src
 
 # TODO add this for building from image
