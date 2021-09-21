@@ -9,7 +9,6 @@ import jwt
 from RabbitMqBuilder import RabbitMqBuilder
 from pprint import pprint
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -44,6 +43,7 @@ class TBConsumer(Consumer):
             super().on_message(_unused_channel, basic_deliver, properties, body)
             return
         LOGGER.info(f"Received message: \n {message}")
+
         action, data, meta_data = self._process_message(message)
 
         if action == "trainBuild":
