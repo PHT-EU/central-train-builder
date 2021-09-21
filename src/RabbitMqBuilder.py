@@ -226,6 +226,9 @@ class RabbitMqBuilder:
     def _get_service_token(self):
         vault_token = os.getenv("VAULT_TOKEN")
         vault_url = os.getenv("VAULT_URL")
+
+        if vault_url[-1] != "/":
+            vault_url = vault_url + "/"
         url = vault_url + "v1/services/TRAIN_BUILDER"
         headers = {"X-Vault-Token": vault_token}
         r = requests.get(url=url, headers=headers)
