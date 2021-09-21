@@ -9,7 +9,6 @@ import jwt
 from RabbitMqBuilder import RabbitMqBuilder
 from pprint import pprint
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -44,14 +43,29 @@ class TBConsumer(Consumer):
             super().on_message(_unused_channel, basic_deliver, properties, body)
             return
         LOGGER.info(f"Received message: \n {message}")
+
         action, data, meta_data = self._process_message(message)
 
-        if action == "trainBuild":
+        if action == "trainBuildStart":
+
+            self.pht_client.publish_message_rabbit_mq(
+                {
+                    "type": "trainBuildStarted",
+                    "data": {
+                        "trainId": data["trainId"]
+                    }
+                },
+                routing_key="ui.tb.event"
+            )
             LOGGER.info("Received build command")
             code, build_message = self.builder.build_train(data, meta_data)
             response = self._make_response(message, code, build_message)
             # Post updates for tr to get the route from vault
             self.post_message_for_train_router(data)
+
+        elif action == "trainBuildStop":
+            # TODO process stop messages
+            pass
 
         else:
             LOGGER.warning(f"Received unrecognized action type - {action}")
@@ -87,7 +101,7 @@ class TBConsumer(Consumer):
     @staticmethod
     def _make_response(message, code, build_message):
         if code == 0:
-            message["type"] = "trainBuilt"
+            message["type"] = "trainBuildFinished"
         else:
             message["type"] = "trainBuildFailed"
         message["data"]["buildMessage"] = build_message
