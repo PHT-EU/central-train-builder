@@ -9,7 +9,6 @@ import jwt
 from RabbitMqBuilder import RabbitMqBuilder
 from pprint import pprint
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -40,19 +39,34 @@ class TBConsumer(Consumer):
         except:
             self.pht_client.publish_message_rabbit_mq(
                 {"type": "trainBuildFailed", "data": {"message": "Malformed JSON"}},
-                routing_key="ui")
+                routing_key="ui.tb.event")
             super().on_message(_unused_channel, basic_deliver, properties, body)
             return
         LOGGER.info(f"Received message: \n {message}")
         action, data, meta_data = self._process_message(message)
 
-        if action == "trainBuild":
+        if action == "trainBuildStart":
             LOGGER.info("Received build command")
             code, build_message = self.builder.build_train(data, meta_data)
             response = self._make_response(message, code, build_message)
             # Post updates for tr to get the route from vault
             self.post_message_for_train_router(data)
 
+        # todo add redis status of train
+        elif action == "trainBuildStop":
+
+            message = {
+                "type": "trainBuildStopped",
+                "data": {
+                    "trainId": data["trainId"]
+                }
+            }
+            # todo actually stop the build if possible
+            self.pht_client.publish_message_rabbit_mq(message, routing_key="ui.tb.event")
+
+        elif action == "trainStatus":
+            pass
+            # todo add support for trainBuildStart
         else:
             LOGGER.warning(f"Received unrecognized action type - {action}")
             response = self._make_response(message, 1, f"Unrecognized action type: {action}")
@@ -68,6 +82,7 @@ class TBConsumer(Consumer):
         :param data: build data for the train
         :return:
         """
+
         message = {
             "type": "trainBuilt",
             "data": {
