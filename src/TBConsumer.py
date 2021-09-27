@@ -59,15 +59,15 @@ class TBConsumer(Consumer):
 
         elif action == "trainBuildStop":
 
-            stop_message = {
+            response = {
                 "type": BuildStatus.STOPPED.value,
                 "data": {
                     "trainId": data["trainId"]
                 }
             }
             # todo actually stop the build if possible
+            LOGGER.info(f"Stopping train build for train:  {data['trainId']}")
             self.builder.set_redis_status(data["trainId"], BuildStatus.STOPPED)
-            self.pht_client.publish_message_rabbit_mq(stop_message, routing_key="ui.tb.event")
 
         elif action == "trainStatus":
             response = self.builder.get_train_status(data["trainId"])
