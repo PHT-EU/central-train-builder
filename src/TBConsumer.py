@@ -1,3 +1,5 @@
+from enum import Enum
+
 from train_lib.clients import Consumer, PHTClient
 from train_lib.clients.rabbitmq import LOG_FORMAT
 # from .TrainBuilder import TrainBuilder
@@ -6,7 +8,7 @@ from dotenv import load_dotenv, find_dotenv
 import os
 import logging
 import jwt
-from RabbitMqBuilder import RabbitMqBuilder
+from RabbitMqBuilder import RabbitMqBuilder, BuildStatus
 from pprint import pprint
 
 LOGGER = logging.getLogger(__name__)
@@ -43,30 +45,32 @@ class TBConsumer(Consumer):
             super().on_message(_unused_channel, basic_deliver, properties, body)
             return
         LOGGER.info(f"Received message: \n {message}")
-        action, data, meta_data = self._process_message(message)
+        action, data, meta_data = self._process_queue_message(message)
 
         if action == "trainBuildStart":
             LOGGER.info("Received build command")
             code, build_message = self.builder.build_train(data, meta_data)
+            if code == 0:
+                # Post updates for tr to get the route from vault
+                self.post_message_for_train_router(data)
+            else:
+                self.builder.set_redis_status(data["trainId"], BuildStatus.FAILED)
             response = self._make_response(message, code, build_message)
-            # Post updates for tr to get the route from vault
-            self.post_message_for_train_router(data)
 
-        # todo add redis status of train
         elif action == "trainBuildStop":
 
-            message = {
-                "type": "trainBuildStopped",
+            stop_message = {
+                "type": BuildStatus.STOPPED.value,
                 "data": {
                     "trainId": data["trainId"]
                 }
             }
             # todo actually stop the build if possible
-            self.pht_client.publish_message_rabbit_mq(message, routing_key="ui.tb.event")
+            self.builder.set_redis_status(data["trainId"], BuildStatus.STOPPED)
+            self.pht_client.publish_message_rabbit_mq(stop_message, routing_key="ui.tb.event")
 
         elif action == "trainStatus":
-            pass
-            # todo add support for trainBuildStart
+            response = self.builder.get_train_status(data["trainId"])
         else:
             LOGGER.warning(f"Received unrecognized action type - {action}")
             response = self._make_response(message, 1, f"Unrecognized action type: {action}")
@@ -93,7 +97,7 @@ class TBConsumer(Consumer):
         self.pht_client.publish_message_rabbit_mq(message, routing_key="tr")
 
     @staticmethod
-    def _process_message(message):
+    def _process_queue_message(message):
         data = message["data"]
         meta_data = message["metadata"]
         action = message["type"]

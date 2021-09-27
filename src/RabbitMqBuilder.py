@@ -1,7 +1,9 @@
 import os
 import tarfile
+from enum import Enum
 
 import docker
+import redis
 import requests
 from train_lib.clients import PHTClient
 from io import BytesIO
@@ -15,6 +17,14 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 
+class BuildStatus(Enum):
+    STARTED = "trainBuildStarted"
+    FAILED = "trainBuildFailed"
+    FINISHED = "trainBuilt"
+    NOT_FOUND = "trainNotFound"
+    STOPPED = "trainBuildStopped"
+
+
 class RabbitMqBuilder:
 
     def __init__(self, pht_client: PHTClient):
@@ -22,7 +32,7 @@ class RabbitMqBuilder:
         self.vault_url = os.getenv("VAULT_URL")
         self.vault_token = os.getenv("VAULT_TOKEN")
         self.registry_url = os.getenv("HARBOR_URL")
-        self.redis = None
+        self.redis = redis.Redis(host=os.getenv("REDIS_HOST", None), decode_responses=True)
         self.docker_client = None
         # Setup redis and docker client
         self.service_key = None
@@ -89,11 +99,31 @@ class RabbitMqBuilder:
         self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
         LOGGER.info(f"Successfully built train - {build_data['trainId']}")
 
-        # except Exception as e:
-        #     LOGGER.error(f"Error building train \n {e}")
-        #     return 1, "error building train"
-
+        self.set_redis_status(build_data["trainId"], BuildStatus.FINISHED)
         return 0, "train successfully built"
+
+    def get_train_status(self, train_id: str):
+
+        status = self._get_redis_status(train_id)
+        LOGGER.info(f"Getting status for train: {train_id} --> {status}")
+        message = {
+            "type": status,
+            "data": {
+                "trainId": train_id
+            }
+        }
+
+        return message
+
+    def set_redis_status(self, train_id: str, state: BuildStatus):
+        self.redis.set(f"{train_id}-tb-status", state.value)
+
+    def _get_redis_status(self, train_id: str) -> str:
+        train_status = self.redis.get(f"{train_id}-tb-status")
+        if train_status:
+            return train_status
+        else:
+            return BuildStatus.NOT_FOUND.value
 
     def _add_train_files(self, container: Container, train_id, config_archive, query_archive=None):
         """
@@ -237,6 +267,9 @@ class RabbitMqBuilder:
         client_data = r.json()["data"]
         self.service_key = client_data["clientSecret"]
         self.client_id = client_data["clientId"]
+
+
+
 
 
 if __name__ == '__main__':
