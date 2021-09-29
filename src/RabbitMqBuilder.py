@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 class BuildStatus(Enum):
     STARTED = "trainBuildStarted"
     FAILED = "trainBuildFailed"
-    FINISHED = "trainBuilt"
+    FINISHED = "trainBuildFinished"
     NOT_FOUND = "trainNotFound"
     STOPPED = "trainBuildStopped"
 
