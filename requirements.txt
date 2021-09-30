@@ -5,3 +5,5 @@ python-dotenv
 pyjwt
 redis
 pika
+loguru
+pytest
