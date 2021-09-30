@@ -211,7 +211,8 @@ class RabbitMqBuilder:
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
         registry = os.getenv("HARBOR_URL").split("//")[-1]
-
+        if executable in ["r", "R"]:
+            executable = "RScript"
         docker_file = f'''
             FROM {registry}/{master_image}
             RUN mkdir /opt/pht_results
