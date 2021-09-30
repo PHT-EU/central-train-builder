@@ -13,6 +13,7 @@ from tarfile import TarInfo, TarFile
 import time
 from dotenv import load_dotenv, find_dotenv
 import logging
+from loguru import logger
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class RabbitMqBuilder:
         self.vault_url = os.getenv("VAULT_URL")
         self.vault_token = os.getenv("VAULT_TOKEN")
         self.registry_url = os.getenv("HARBOR_URL")
-        self.redis = redis.Redis(host=os.getenv("REDIS_HOST", None), decode_responses=True)
+        self.redis = None
         self.docker_client = None
         # Setup redis and docker client
         self.service_key = None
@@ -52,10 +53,21 @@ class RabbitMqBuilder:
         :return:
         """
         # Connect to redis either in docker-compose container or on localhost
+        logger.info("Initializing docker client and logging into registry")
         self.docker_client = docker.client.from_env()
         login_result = self.docker_client.login(username=os.getenv("HARBOR_USER"), password=os.getenv("HARBOR_PW"),
                                                 registry=self.registry_url)
+        logger.info(f"Login result -- {login_result['Status']}")
+
+        logger.info("Requesting service token")
         self._get_service_token()
+        logger.info("Service token obtained")
+
+        logger.info("Connecting to redis")
+        self.redis = redis.Redis(host=os.getenv("REDIS_HOST", None), decode_responses=True)
+        logger.info("Validating setup")
+        self._validate_setup()
+        logger.info("Setup complete")
 
     def build_train(self, build_data: dict, meta_data: dict):
         """
@@ -69,6 +81,7 @@ class RabbitMqBuilder:
         # pull master image
         registry = os.getenv("HARBOR_URL").split("//")[-1]
         master_image = f"{registry}/{build_data['masterImage']}"
+        logger.info(f"Train: {build_data['trainId']} -- Pulling master image {master_image}...")
         self.docker_client.images.pull(master_image, tag="latest")
 
         # try:
@@ -77,12 +90,15 @@ class RabbitMqBuilder:
             executable=build_data["entrypointExecutable"],
             entrypoint_file=build_data["entrypointPath"])
 
+        logger.info(f"Train: {build_data['trainId']} -- Building base image")
         # Build the image based on the specifications passed in the message
         image, logs = self.docker_client.images.build(fileobj=docker_file_obj)
         # Start a temporary container
+        logger.info(f"Train: {build_data['trainId']} -- Starting temporary container")
         container = self.docker_client.containers.create(image.id)
         # Generate the train config file and query
 
+        logger.info(f"Train: {build_data['trainId']} -- Generating query archive")
         query_archive = None
 
         if build_data["query"]:
@@ -97,7 +113,7 @@ class RabbitMqBuilder:
         # Post route to vault to start processing
         print("build data: ", build_data)
         self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
-        LOGGER.info(f"Successfully built train - {build_data['trainId']}")
+        logger.info(f"Train: {build_data['trainId']} -- Build finished")
 
         self.set_redis_status(build_data["trainId"], BuildStatus.FINISHED)
         return 0, "train successfully built"
@@ -105,7 +121,7 @@ class RabbitMqBuilder:
     def get_train_status(self, train_id: str):
 
         status = self._get_redis_status(train_id)
-        LOGGER.info(f"Getting status for train: {train_id} --> {status}")
+        logger.info(f"Getting status for train: {train_id} --> {status}")
         message = {
             "type": status,
             "data": {
@@ -117,6 +133,13 @@ class RabbitMqBuilder:
 
     def set_redis_status(self, train_id: str, state: BuildStatus):
         self.redis.set(f"{train_id}-tb-status", state.value)
+
+    def _validate_setup(self):
+        fields = vars(self)
+
+        for key in fields:
+            if not fields[key]:
+                raise ValueError(f"Instance variable {key} could not be initialized.")
 
     def _get_redis_status(self, train_id: str) -> str:
         train_status = self.redis.get(f"{train_id}-tb-status")
@@ -137,7 +160,7 @@ class RabbitMqBuilder:
         :return:
         """
 
-        LOGGER.info("Adding train files to container")
+        logger.info(f"Train: {train_id} -- Adding files to container")
         # Get the train files from pht API
         train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=self.service_key,
                                                                 client_id=self.client_id)
@@ -157,7 +180,7 @@ class RabbitMqBuilder:
         :return:
         """
 
-        LOGGER.info("Generating train config")
+        logger.info(f"Train: {build_data['trainId']} -- Generating train config")
         user_public_key = self.pht_client.get_user_pk(build_data["userId"])
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
         registry = os.getenv("HARBOR_URL").split("//")[-1]
@@ -229,12 +252,14 @@ class RabbitMqBuilder:
 
         registry = os.getenv("HARBOR_URL").split("//")[-1]
         repo = f"{registry}/pht_incoming/{train_id}"
-        LOGGER.info(f"Pushing images to {repo}")
+        logger.info(f"Train: {train_id} -- Committing train images, repo: {repo}")
         container.commit(repo, tag="latest")
         container.commit(repo, tag="base")
+        logger.info(f"Train: {train_id} -- Pushing images")
         push_latest = self.docker_client.images.push(repo, tag="latest")
         push_base = self.docker_client.images.push(repo, tag="base")
         # remove images after building
+        logger.info(f"Train: {train_id} -- Removing train artifacts")
         self.docker_client.images.remove(repo + ":base", noprune=False)
         self.docker_client.images.remove(repo + ":latest", noprune=False)
 
@@ -276,4 +301,4 @@ if __name__ == '__main__':
     load_dotenv(find_dotenv())
     client = PHTClient(api_url="https://pht.tada5hi.net/api/pht/trains/")
     builder = RabbitMqBuilder(pht_client=client)
-    builder._get_service_token()
+
