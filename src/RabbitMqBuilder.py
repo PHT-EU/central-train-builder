@@ -44,7 +44,6 @@ class RabbitMqBuilder:
 
         # Set up Pht client
         self.pht_client = pht_client
-        LOGGER.info("Train Builder setup finished")
 
     def _setup(self):
         """
@@ -111,7 +110,7 @@ class RabbitMqBuilder:
         self._add_train_files(container, build_data["trainId"], config_archive, query_archive)
         self._tag_and_push_images(container, build_data["trainId"])
         # Post route to vault to start processing
-        print("build data: ", build_data)
+        logger.info("build data: {} ", build_data)
         self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
         logger.info(f"Train: {build_data['trainId']} -- Build finished")
 
