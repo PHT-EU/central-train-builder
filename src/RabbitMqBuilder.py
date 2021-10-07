@@ -266,7 +266,7 @@ class RabbitMqBuilder:
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
         registry = os.getenv("HARBOR_URL").split("//")[-1]
         if executable in ["r", "R"]:
-            executable = "RScript"
+            executable = "Rscript"
         docker_file = f'''
             FROM {registry}/{master_image}
             RUN mkdir /opt/pht_results
@@ -294,11 +294,7 @@ class RabbitMqBuilder:
         self.client_id = client_data["clientId"]
 
 
-
-
-
 if __name__ == '__main__':
     load_dotenv(find_dotenv())
     client = PHTClient(api_url="https://pht.tada5hi.net/api/pht/trains/")
     builder = RabbitMqBuilder(pht_client=client)
-
