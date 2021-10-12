@@ -23,7 +23,6 @@ class TBConsumer(Consumer):
         if vault_url[-1] != "/":
             vault_url = vault_url + "/"
 
-        print("vault url ", vault_url)
         self.pht_client = PHTClient(ampq_url=amqp_url, api_url=api_url,
                                     vault_url=vault_url, vault_token=os.getenv("VAULT_TOKEN"))
 
