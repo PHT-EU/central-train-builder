@@ -14,6 +14,7 @@ import time
 from dotenv import load_dotenv, find_dotenv
 import logging
 from loguru import logger
+from hvac import Client
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +42,11 @@ class RabbitMqBuilder:
         self._setup()
 
         assert self.vault_url and self.vault_token and self.registry_url
+
+        self.vault_client = Client(
+            url=os.getenv("VAULT_URL"),
+            token=os.getenv("VAULT_TOKEN")
+        )
 
         # Set up Pht client
         self.pht_client = pht_client
@@ -127,7 +133,6 @@ class RabbitMqBuilder:
                 "trainId": train_id
             }
         }
-
         return message
 
     def set_redis_status(self, train_id: str, state: BuildStatus):
@@ -180,7 +185,9 @@ class RabbitMqBuilder:
         """
 
         logger.info(f"Train: {build_data['trainId']} -- Generating train config")
+
         user_public_key = self.pht_client.get_user_pk(build_data["userId"])
+
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
         registry = os.getenv("HARBOR_URL").split("//")[-1]
         master_image = f"{registry}/{build_data['masterImage']}"

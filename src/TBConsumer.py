@@ -14,8 +14,6 @@ class TBConsumer(Consumer):
 
     def __init__(self, amqp_url: str, queue: str = "", public_key_path: str = None, routing_key: str = None):
         super().__init__(amqp_url, queue, routing_key=routing_key)
-        # load_dotenv(find_dotenv())
-        # self.builder = TrainBuilder()
 
         api_url = os.getenv("UI_TRAIN_API")
         if api_url[-1] != "/":
@@ -76,7 +74,7 @@ class TBConsumer(Consumer):
             logger.info(f"Stopping train build for train:  {data['trainId']}")
             self.builder.set_redis_status(data["trainId"], BuildStatus.STOPPED)
 
-        elif action == "trainStatus":
+        elif action == "trainBuildStatus":
             response = self.builder.get_train_status(data["trainId"])
         else:
             logger.warning(f"Received unrecognized action type - {action}")

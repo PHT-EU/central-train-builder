@@ -7,3 +7,4 @@ redis
 pika
 loguru
 pytest
+hvac
