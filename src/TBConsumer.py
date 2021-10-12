@@ -1,14 +1,10 @@
-from enum import Enum
-
 from train_lib.clients import Consumer, PHTClient
 from train_lib.clients.rabbitmq import LOG_FORMAT
 import json
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
-import jwt
 from RabbitMqBuilder import RabbitMqBuilder, BuildStatus
-from pprint import pprint
 from loguru import logger
 
 LOGGER = logging.getLogger(__name__)
@@ -20,8 +16,19 @@ class TBConsumer(Consumer):
         super().__init__(amqp_url, queue, routing_key=routing_key)
         # load_dotenv(find_dotenv())
         # self.builder = TrainBuilder()
-        self.pht_client = PHTClient(ampq_url=amqp_url, api_url=os.getenv("UI_TRAIN_API"),
-                                    vault_url=os.getenv("VAULT_URL"), vault_token=os.getenv("VAULT_TOKEN"))
+
+        api_url = os.getenv("UI_TRAIN_API")
+        if api_url[-1] != "/":
+            api_url += "/"
+
+
+        vault_url = os.getenv("VAULT_URL")
+        if vault_url[-1] != "/":
+            vault_url += "/"
+        self.pht_client = PHTClient(ampq_url=amqp_url, api_url=api_url,
+                                    vault_url=vault_url, vault_token=os.getenv("VAULT_TOKEN"))
+
+
 
         self.builder = RabbitMqBuilder(self.pht_client)
 
