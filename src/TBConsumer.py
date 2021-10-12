@@ -54,7 +54,7 @@ class TBConsumer(Consumer):
         logger.info(f"Received message: \n {message}")
         action, data, meta_data = self._process_queue_message(message)
 
-        if action == "trainBuildStart":
+        if action in ["trainBuildStart", "trainBuild"]:
             logger.info("Received build command")
             code, build_message = self.builder.build_train(data, meta_data)
             if code == 0:
