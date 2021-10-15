@@ -136,6 +136,13 @@ class RabbitMqBuilder:
         return message
 
     def set_redis_status(self, train_id: str, state: BuildStatus):
+        """
+        Set the status of the train defined by its id to one of the enum values of BuildStatus
+
+        :param train_id: id of the train
+        :param state: enum identifier of the build status
+        :return:
+        """
         self.redis.set(f"{train_id}-tb-status", state.value)
 
     def _validate_setup(self):
@@ -286,6 +293,11 @@ class RabbitMqBuilder:
         return file_obj
 
     def _get_service_token(self):
+        """
+        Gets the service token from vault to allow the train builder to authenticate against the central API
+
+        :return:
+        """
         vault_token = os.getenv("VAULT_TOKEN")
         vault_url = os.getenv("VAULT_URL")
 
