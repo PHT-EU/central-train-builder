@@ -1,0 +1,11 @@
+[run]
+source =
+    src
+
+[paths]
+source =
+    src
+
+[report]
+show_missing = true
+precision = 2

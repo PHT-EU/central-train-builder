@@ -39,6 +39,8 @@ class RabbitMqBuilder:
         # Setup redis and docker client
         self.service_key = None
         self.client_id = None
+
+        # Run setup
         self._setup()
 
         assert self.vault_url and self.vault_token and self.registry_url

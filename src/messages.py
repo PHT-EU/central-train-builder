@@ -1,10 +1,10 @@
 import json
 from pydantic import BaseModel, StrBytes, Protocol
-from typing import Union, List, Type, Optional
+from typing import Union, List, Type, Optional, Callable, Any
 
 
 class BuildMessage(BaseModel):
-    message_id: str
+    message_id: Optional[str] = None
     type: str
     metadata: dict
     data: dict
@@ -24,6 +24,10 @@ class BuildMessage(BaseModel):
     @classmethod
     def parse_raw(cls: Type['BuildMessage'], b: StrBytes, *, content_type: str = None, encoding: str = 'utf8',
                   proto: Protocol = None, allow_pickle: bool = False) -> 'BuildMessage':
+
+        if content_type == "str" and content_type != "utf8":
+            return cls.from_json(b.encode(encoding))
+
         return cls.from_json(b)
 
     @classmethod

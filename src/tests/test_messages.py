@@ -67,7 +67,21 @@ def build_message_query():
     }
 
 
-def test_build_message_from_json(build_message):
+@pytest.fixture
+def status_message():
+    return {
+        "type": "trainStatus",
+        "data": {
+            "userId": 5,
+            "trainId": "test-train-1"
+        },
+        "metadata": {
+
+        }
+    }
+
+
+def test_build_message_from_json(build_message, build_message_query):
     build_hash = build_message["data"]["hash"]
     message = BuildMessage.from_json(build_message)
     assert isinstance(message, BuildMessage)
@@ -85,10 +99,9 @@ def test_build_message_from_json(build_message):
     with pytest.raises(ValueError):
         message = BuildMessage.from_json(1)
 
+    query_message = BuildMessage.from_json(build_message_query)
+    assert query_message
 
-def test_build_message_to_json(build_message):
-    message = BuildMessage.from_json(build_message)
+    query_message2 = BuildMessage.parse_raw(json.dumps(build_message_query).encode("utf-8"))
 
-    json_string = message.to_json()
-
-    assert json.loads(json_string) == build_message
+    assert query_message == query_message2
