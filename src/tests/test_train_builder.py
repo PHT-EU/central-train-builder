@@ -1,6 +1,6 @@
 import pytest
 from dotenv import load_dotenv, find_dotenv
-from src.RabbitMqBuilder import RabbitMqBuilder
+from ..RabbitMqBuilder import RabbitMqBuilder
 from train_lib.clients import PHTClient
 
 

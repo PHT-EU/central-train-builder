@@ -70,6 +70,7 @@ def build_message_query():
 def test_build_message_from_json(build_message):
     build_hash = build_message["data"]["hash"]
     message = BuildMessage.from_json(build_message)
+    assert isinstance(message, BuildMessage)
     assert message
     assert message.hash == build_hash
 
@@ -80,3 +81,14 @@ def test_build_message_from_json(build_message):
     message = BuildMessage.from_json(json.dumps(build_message).encode("utf-8"))
     assert message
     assert message.hash == build_hash
+
+    with pytest.raises(ValueError):
+        message = BuildMessage.from_json(1)
+
+
+def test_build_message_to_json(build_message):
+    message = BuildMessage.from_json(build_message)
+
+    json_string = message.to_json()
+
+    assert json.loads(json_string) == build_message

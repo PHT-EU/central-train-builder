@@ -1,25 +1,13 @@
 import json
-from abc import ABC, abstractmethod
-from typing import Union, List
+from pydantic import BaseModel, StrBytes, Protocol
+from typing import Union, List, Type, Optional
 
 
-class Message(ABC):
+class BuildMessage(BaseModel):
     message_id: str
     type: str
     metadata: dict
     data: dict
-
-    @classmethod
-    @abstractmethod
-    def from_json(cls, json_message: Union[dict, str, bytes]):
-        pass
-
-    @abstractmethod
-    def to_json(self):
-        pass
-
-
-class BuildMessage(Message):
     train_id: str
     proposal_id: int
     stations: List[str]
@@ -30,36 +18,35 @@ class BuildMessage(Message):
     session_id: str
     hash: str
     hash_signed: str
-    query: dict
-    user_he_key: str
+    query: Optional[dict] = None
+    user_he_key: Optional[str] = None
 
     @classmethod
-    def from_json(cls, json_message: Union[dict, str, bytes]):
-        message_dict = load_json_dict(json_message)
-        cls.message_id = message_dict.get("id")
-        cls.type = message_dict.get("type")
-        cls.data = message_dict.get("data")
-        cls.metadata = message_dict.get("metadata")
-        cls.train_id = cls.data["trainId"]
-        cls.proposal_id = cls.data["proposalId"]
-        cls.stations = cls.data["stations"]
-        cls.files = cls.data["files"]
-        cls.master_image = cls.data["masterImage"]
-        cls.entrypoint_executable = cls.data["entrypointExecutable"]
-        cls.entrypoint_path = cls.data["entrypointPath"]
-        cls.session_id = cls.data["sessionId"]
-        cls.hash = cls.data["hash"]
-        cls.hash_signed = cls.data["hashSigned"]
-        return cls
+    def parse_raw(cls: Type['BuildMessage'], b: StrBytes, *, content_type: str = None, encoding: str = 'utf8',
+                  proto: Protocol = None, allow_pickle: bool = False) -> 'BuildMessage':
+        return cls.from_json(b)
 
-    def to_json(self):
-        return json.dumps(
-            {
-                "id": self.message_id,
-                "type": self.type,
-                "metadata": self.metadata,
-                "data": self.data
-            }
+    @classmethod
+    def from_json(cls: Type['BuildMessage'], json_message: Union[dict, str, bytes]) -> 'BuildMessage':
+        message_dict = load_json_dict(json_message)
+        data = message_dict.get("data")
+        return cls(
+            message_id=message_dict.get("id"),
+            type=message_dict.get("type"),
+            data=message_dict.get("data"),
+            metadata=message_dict.get("metadata"),
+            train_id=data["trainId"],
+            proposal_id=data["proposalId"],
+            stations=data["stations"],
+            files=data["files"],
+            master_image=data["masterImage"],
+            entrypoint_executable=data["entrypointExecutable"],
+            entrypoint_path=data["entrypointPath"],
+            session_id=data["sessionId"],
+            hash=data["hash"],
+            hash_signed=data["hashSigned"],
+            query=data.get("query"),
+            user_he_key=data.get("user_he_key")
         )
 
 
