@@ -40,7 +40,7 @@ jobs:
       - name: Scan image
         uses: Azure/container-scan@v0
         with:
-          image-name: ${{ IMAGE_NAME }}
+          image-name: ${{ env.IMAGE_NAME }}
       
       - name: Push image
         run: |
