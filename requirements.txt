@@ -6,5 +6,4 @@ pyjwt
 redis
 pika
 loguru
-pytest
 hvac

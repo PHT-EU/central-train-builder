@@ -117,6 +117,7 @@ class RabbitMqBuilder:
         self._tag_and_push_images(container, build_data["trainId"])
         # Post route to vault to start processing
         logger.info("build data: {} ", build_data)
+        print(build_data["stations"])
         self.pht_client.post_route_to_vault(build_data["trainId"], build_data["stations"])
         logger.info(f"Train: {build_data['trainId']} -- Build finished")
 
