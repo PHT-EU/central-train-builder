@@ -1,5 +1,7 @@
 [![Build and push image](https://github.com/PHT-Medic/central-train-builder/actions/workflows/CI.yml/badge.svg)](https://github.com/PHT-Medic/central-train-builder/actions/workflows/CI.yml)
 [![CodeQL](https://github.com/PHT-Medic/central-train-builder/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/PHT-Medic/central-train-builder/actions/workflows/codeql-analysis.yml)
+[![Vulnerability Scan](https://github.com/PHT-Medic/central-train-builder/actions/workflows/image_scan.yml/badge.svg)](https://github.com/PHT-Medic/central-train-builder/actions/workflows/image_scan.yml)
+
 # TrainBuilder Service
 This repository contains the TrainBuilder class responsible for building train Images according to a given schema,
 adding these images to the pht/incoming harbor project and adding the associated to Vault storage
