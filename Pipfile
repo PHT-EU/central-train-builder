@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+cryptography = "*"
+docker = "*"
+requests = "*"
+python-dotenv = "*"
+redis = "*"
+pika = "*"
+loguru = "*"
+hvac = "*"
+pydantic = "*"
+PyJWT = "*"
+
+[dev-packages]
+pytest = "*"
+coverage = "*"
+
+[requires]
+python_version = "3.9"
