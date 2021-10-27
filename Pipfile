@@ -15,9 +15,11 @@ hvac = "*"
 pydantic = "*"
 PyJWT = "*"
 
+
 [dev-packages]
 pytest = "*"
 coverage = "*"
+bump2version = "*"
 
 [requires]
 python_version = "3.9"
