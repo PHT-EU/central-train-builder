@@ -1,6 +1,7 @@
 import os
 import tarfile
 from enum import Enum
+from typing import List
 
 import docker
 import redis
@@ -94,7 +95,8 @@ class RabbitMqBuilder:
         # try:
         docker_file_obj = self._make_dockerfile(
             master_image=build_data["masterImage"],
-            executable=build_data["entrypointExecutable"],
+            command=build_data["entryPointCommand"],
+            command_args=build_data["entryPointCommandArguments"],
             entrypoint_file=build_data["entrypointPath"])
 
         logger.info(f"Train: {build_data['trainId']} -- Building base image")
@@ -280,18 +282,25 @@ class RabbitMqBuilder:
         self.docker_client.images.remove(repo + ":latest", noprune=False)
 
     @staticmethod
-    def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
+    def _make_dockerfile(master_image: str, command: str, entrypoint_file: str, command_args: List[str] = None):
         registry = os.getenv("HARBOR_URL").split("//")[-1]
-        if executable in ["r", "R"]:
-            executable = "Rscript"
+        if command_args:
+            docker_command_args = [f'"{arg}"' for arg in command_args]
+            docker_command_args = ", ".join(docker_command_args) + ", "
+        else:
+            docker_command_args = ""
+
+        print(command_args)
         docker_file = f'''
             FROM {registry}/{master_image}
             RUN mkdir /opt/pht_results
             RUN mkdir /opt/pht_train
             RUN chmod -R +x /opt/pht_train
-            CMD ["{executable}", "/opt/pht_train/{entrypoint_file}"]
+            CMD ["{command}", {docker_command_args} "/opt/pht_train/{entrypoint_file}"]
             '''
         file_obj = BytesIO(docker_file.encode("utf-8"))
+
+        print(docker_file)
 
         return file_obj
 
