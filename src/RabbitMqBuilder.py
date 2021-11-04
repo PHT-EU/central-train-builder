@@ -88,7 +88,7 @@ class RabbitMqBuilder:
 
         # pull master image
         registry = os.getenv("HARBOR_URL").split("//")[-1]
-        master_image = f"{registry}/{build_data['masterImage']}"
+        master_image = f"{registry}/master/{build_data['masterImage']}"
         logger.info(f"Train: {build_data['trainId']} -- Pulling master image {master_image}...")
         self.docker_client.images.pull(master_image, tag="latest")
 
@@ -202,7 +202,7 @@ class RabbitMqBuilder:
 
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
         registry = os.getenv("HARBOR_URL").split("//")[-1]
-        master_image = f"{registry}/{build_data['masterImage']}"
+        master_image = f"{registry}/master/{build_data['masterImage']}"
 
         config = {
             "master_image": master_image,
