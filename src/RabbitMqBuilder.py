@@ -290,7 +290,8 @@ class RabbitMqBuilder:
         else:
             docker_command_args = ""
 
-        print(command_args)
+        if entrypoint_file[:2] == "./":
+            entrypoint_file = entrypoint_file[2:]
         docker_file = f'''
             FROM {registry}/master/{master_image}
             RUN mkdir /opt/pht_results
@@ -323,6 +324,8 @@ class RabbitMqBuilder:
         client_data = r.json()["data"]
         self.service_key = client_data["clientSecret"]
         self.client_id = client_data["clientId"]
+
+        print(client_data)
 
 
 if __name__ == '__main__':
