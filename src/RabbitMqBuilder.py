@@ -95,8 +95,8 @@ class RabbitMqBuilder:
         # try:
         docker_file_obj = self._make_dockerfile(
             master_image=build_data["masterImage"],
-            command=build_data["entryPointCommand"],
-            command_args=build_data["entryPointCommandArguments"],
+            command=build_data["entrypointCommand"],
+            command_args=build_data["entrypointCommandArguments"],
             entrypoint_file=build_data["entrypointPath"])
 
         logger.info(f"Train: {build_data['trainId']} -- Building base image")
