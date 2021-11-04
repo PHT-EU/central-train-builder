@@ -292,7 +292,7 @@ class RabbitMqBuilder:
 
         print(command_args)
         docker_file = f'''
-            FROM {registry}/{master_image}
+            FROM {registry}/master/{master_image}
             RUN mkdir /opt/pht_results
             RUN mkdir /opt/pht_train
             RUN chmod -R +x /opt/pht_train
