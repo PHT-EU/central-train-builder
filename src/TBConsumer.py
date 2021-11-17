@@ -4,7 +4,7 @@ import json
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
-from RabbitMqBuilder import RabbitMqBuilder, BuildStatus
+from TrainBuilder import TrainBuilder, BuildStatus
 from loguru import logger
 
 LOGGER = logging.getLogger(__name__)
@@ -26,8 +26,9 @@ class TBConsumer(Consumer):
         self.pht_client = PHTClient(ampq_url=amqp_url, api_url=api_url,
                                     vault_url=vault_url, vault_token=os.getenv("VAULT_TOKEN"))
 
-        self.builder = RabbitMqBuilder(self.pht_client)
+        self.builder = TrainBuilder(self.pht_client)
 
+        # Load the public key if it exists
         if public_key_path:
             with open(public_key_path, "r") as public_key_file:
                 self.pk = public_key_file.read()

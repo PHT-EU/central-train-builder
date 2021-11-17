@@ -1,6 +1,6 @@
 import pytest
 from dotenv import load_dotenv, find_dotenv
-from ..RabbitMqBuilder import RabbitMqBuilder
+from ..TrainBuilder import TrainBuilder
 from train_lib.clients import PHTClient
 
 
@@ -17,7 +17,7 @@ def test_initialization_and_setup():
     load_dotenv(find_dotenv())
     client = PHTClient(api_url="https://pht.tada5hi.net/api/pht/trains/")
 
-    tb = RabbitMqBuilder(client)
+    tb = TrainBuilder(client)
 
 
 

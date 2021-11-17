@@ -27,7 +27,7 @@ class BuildStatus(Enum):
     STOPPED = "trainBuildStopped"
 
 
-class RabbitMqBuilder:
+class TrainBuilder:
 
     def __init__(self, pht_client: PHTClient):
         load_dotenv(find_dotenv())
@@ -319,4 +319,4 @@ class RabbitMqBuilder:
 if __name__ == '__main__':
     load_dotenv(find_dotenv())
     client = PHTClient(api_url="https://pht.tada5hi.net/api/pht/trains/")
-    builder = RabbitMqBuilder(pht_client=client)
+    builder = TrainBuilder(pht_client=client)
