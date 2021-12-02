@@ -198,7 +198,7 @@ class RabbitMqBuilder:
 
         logger.info(f"Train: {build_data['trainId']} -- Generating train config")
 
-        user_public_key = self.pht_client.get_user_pk(build_data["userId"])
+        user_secrets = self.pht_client.get_user_secrets(build_data["userId"])
 
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
         registry = os.getenv("HARBOR_URL").split("//")[-1]
@@ -209,7 +209,7 @@ class RabbitMqBuilder:
             "user_id": build_data["userId"],
             "train_id": build_data["trainId"],
             "session_id": build_data["sessionId"],
-            "rsa_user_public_key": user_public_key,
+            "rsa_user_public_key": user_secrets.rsa_public_key,
             "encrypted_key": None,
             "rsa_public_keys": station_public_keys,
             "e_h": build_data["hash"],
@@ -218,7 +218,7 @@ class RabbitMqBuilder:
             "e_d_sig": None,
             "digital_signature": None,
             "proposal_id": build_data["proposalId"],
-            "user_he_key": build_data.get("user_he_key", None),
+            "user_he_key": user_secrets.paillier_public_key,
             "immutable_file_list": build_data["files"]
         }
 
