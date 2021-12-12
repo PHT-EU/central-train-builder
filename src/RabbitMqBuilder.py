@@ -276,8 +276,8 @@ class RabbitMqBuilder:
         push_base = self.docker_client.images.push(repo, tag="base")
         # remove images after building
         logger.info(f"Train: {train_id} -- Removing train artifacts")
-        self.docker_client.images.remove(repo + ":base", noprune=False)
-        self.docker_client.images.remove(repo + ":latest", noprune=False)
+        self.docker_client.images.remove(repo + ":base", noprune=False, force=True)
+        self.docker_client.images.remove(repo + ":latest", noprune=False, force=True)
 
     @staticmethod
     def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
