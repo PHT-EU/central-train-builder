@@ -1,6 +1,7 @@
 import os
 import tarfile
 from enum import Enum
+from typing import List
 
 import docker
 import redis
@@ -87,14 +88,15 @@ class RabbitMqBuilder:
 
         # pull master image
         registry = os.getenv("HARBOR_URL").split("//")[-1]
-        master_image = f"{registry}/{build_data['masterImage']}"
+        master_image = f"{registry}/master/{build_data['masterImage']}"
         logger.info(f"Train: {build_data['trainId']} -- Pulling master image {master_image}...")
         self.docker_client.images.pull(master_image, tag="latest")
 
         # try:
         docker_file_obj = self._make_dockerfile(
             master_image=build_data["masterImage"],
-            executable=build_data["entrypointExecutable"],
+            command=build_data["entrypointCommand"],
+            command_args=build_data["entrypointCommandArguments"],
             entrypoint_file=build_data["entrypointPath"])
 
         logger.info(f"Train: {build_data['trainId']} -- Building base image")
@@ -200,7 +202,7 @@ class RabbitMqBuilder:
 
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
         registry = os.getenv("HARBOR_URL").split("//")[-1]
-        master_image = f"{registry}/{build_data['masterImage']}"
+        master_image = f"{registry}/master/{build_data['masterImage']}"
 
         config = {
             "master_image": master_image,
@@ -280,18 +282,26 @@ class RabbitMqBuilder:
         self.docker_client.images.remove(repo + ":latest", noprune=False, force=True)
 
     @staticmethod
-    def _make_dockerfile(master_image: str, executable: str, entrypoint_file: str):
+    def _make_dockerfile(master_image: str, command: str, entrypoint_file: str, command_args: List[str] = None):
         registry = os.getenv("HARBOR_URL").split("//")[-1]
-        if executable in ["r", "R"]:
-            executable = "Rscript"
+        if command_args:
+            docker_command_args = [f'"{arg}"' for arg in command_args]
+            docker_command_args = ", ".join(docker_command_args) + ", "
+        else:
+            docker_command_args = ""
+
+        if entrypoint_file[:2] == "./":
+            entrypoint_file = entrypoint_file[2:]
         docker_file = f'''
-            FROM {registry}/{master_image}
+            FROM {registry}/master/{master_image}
             RUN mkdir /opt/pht_results
             RUN mkdir /opt/pht_train
             RUN chmod -R +x /opt/pht_train
-            CMD ["{executable}", "/opt/pht_train/{entrypoint_file}"]
+            CMD ["{command}", {docker_command_args} "/opt/pht_train/{entrypoint_file}"]
             '''
         file_obj = BytesIO(docker_file.encode("utf-8"))
+
+        print(docker_file)
 
         return file_obj
 
@@ -314,6 +324,8 @@ class RabbitMqBuilder:
         client_data = r.json()["data"]
         self.service_key = client_data["clientSecret"]
         self.client_id = client_data["clientId"]
+
+        print(client_data)
 
 
 if __name__ == '__main__':
