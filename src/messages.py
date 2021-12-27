@@ -25,7 +25,7 @@ class BuildMessage(BaseModel):
     def parse_raw(cls: Type['BuildMessage'], b: StrBytes, *, content_type: str = None, encoding: str = 'utf8',
                   proto: Protocol = None, allow_pickle: bool = False) -> 'BuildMessage':
 
-        if content_type == "str" and content_type != "utf8":
+        if content_type == "str" and encoding != "utf8":
             return cls.from_json(b.encode(encoding))
 
         return cls.from_json(b)
