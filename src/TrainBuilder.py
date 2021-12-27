@@ -1,12 +1,11 @@
+import base64
 import os
 import tarfile
 from enum import Enum
 from typing import List
-
 import docker
 import redis
 import requests
-from train_lib.clients import PHTClient
 from io import BytesIO
 from docker.models.containers import Container
 import json
@@ -16,6 +15,9 @@ from dotenv import load_dotenv, find_dotenv
 import logging
 from loguru import logger
 from hvac import Client
+from requests import HTTPError
+
+from train_lib.clients import PHTClient
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +30,7 @@ class BuildStatus(Enum):
     STOPPED = "trainBuildStopped"
 
 
-class RabbitMqBuilder:
+class TrainBuilder:
 
     def __init__(self, pht_client: PHTClient):
         load_dotenv(find_dotenv())
@@ -40,6 +42,7 @@ class RabbitMqBuilder:
         # Setup redis and docker client
         self.service_key = None
         self.client_id = None
+        self.api_url = None
 
         # Run setup
         self._setup()
@@ -70,6 +73,8 @@ class RabbitMqBuilder:
         logger.info("Requesting service token")
         self._get_service_token()
         logger.info("Service token obtained")
+
+        self.api_url = os.getenv("UI_TRAIN_API")
 
         logger.info("Connecting to redis")
         self.redis = redis.Redis(host=os.getenv("REDIS_HOST", None), decode_responses=True)
@@ -186,6 +191,48 @@ class RabbitMqBuilder:
         if query_archive:
             container.put_archive("/opt/pht_train", query_archive)
 
+    def get_train_files(self, train_id: str) -> BytesIO:
+
+        logger.info(f"Train: {train_id} -- Getting files from central API")
+        try:
+            train_archive = self._get_tar_archive_from_api(train_id)
+        except HTTPError:
+            logger.error(f"Error getting train files from central API")
+            logger.info(f"Attempting to refresh service credentials")
+            self._get_service_token()
+            train_archive = self._get_tar_archive_from_api(train_id)
+
+        return train_archive
+
+    def _get_tar_archive_from_api(self, train_id: str) -> BytesIO:
+        """
+        Read a stream of tar data from the given endpoint and return an in memory BytesIO object containing the data
+
+        :param endpoint: address relative to this instances api address
+        :param params: dictionary containing additional parameters to be passed to the request
+        :param external_endpoint: boolean parameter controlling whether the URL where the request is sent should built using
+        the combination of api + endpoint or if the connection should be attempted on the raw endpoint string
+
+        :return:
+        """
+        url = f"{self.api_url}{train_id}/files/download"
+        headers = self._create_api_headers(api_token=self.service_key, client_id=self.client_id)
+        with requests.get(url, headers=headers, stream=True) as r:
+            r.raise_for_status()
+            file_obj = BytesIO()
+            for chunk in r.iter_content():
+                file_obj.write(chunk)
+            file_obj.seek(0)
+
+        return file_obj
+
+    @staticmethod
+    def _create_api_headers(api_token: str, client_id: str = "TRAIN_BUILDER") -> dict:
+        auth_string = f"{client_id}:{api_token}"
+        auth_string = base64.b64encode(auth_string.encode("utf-8")).decode()
+        headers = {"Authorization": f"Basic {auth_string}"}
+        return headers
+
     def _make_train_config(self, build_data: dict, meta_data: dict):
         """
         Generate a tar archive containing a json file train_config.json in which the relevant security values for the
@@ -301,8 +348,6 @@ class RabbitMqBuilder:
             '''
         file_obj = BytesIO(docker_file.encode("utf-8"))
 
-        print(docker_file)
-
         return file_obj
 
     def _get_service_token(self):
@@ -311,13 +356,11 @@ class RabbitMqBuilder:
 
         :return:
         """
-        vault_token = os.getenv("VAULT_TOKEN")
-        vault_url = os.getenv("VAULT_URL")
 
-        if vault_url[-1] != "/":
-            vault_url = vault_url + "/"
-        url = vault_url + "v1/services/TRAIN_BUILDER"
-        headers = {"X-Vault-Token": vault_token}
+        if self.vault_url[-1] != "/":
+            self.vault_url = self.vault_url + "/"
+        url = self.vault_url + "v1/services/TRAIN_BUILDER"
+        headers = {"X-Vault-Token": self.vault_token}
         r = requests.get(url=url, headers=headers)
         r.raise_for_status()
 
@@ -325,10 +368,8 @@ class RabbitMqBuilder:
         self.service_key = client_data["clientSecret"]
         self.client_id = client_data["clientId"]
 
-        print(client_data)
-
 
 if __name__ == '__main__':
     load_dotenv(find_dotenv())
     client = PHTClient(api_url="https://pht.tada5hi.net/api/pht/trains/")
-    builder = RabbitMqBuilder(pht_client=client)
+    builder = TrainBuilder(pht_client=client)
