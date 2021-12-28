@@ -43,16 +43,11 @@ class TrainBuilder:
         self.service_key = None
         self.client_id = None
         self.api_url = None
-
+        self.vault_client = None
         # Run setup
         self._setup()
 
         assert self.vault_url and self.vault_token and self.registry_url
-
-        self.vault_client = Client(
-            url=os.getenv("VAULT_URL"),
-            token=os.getenv("VAULT_TOKEN")
-        )
 
         # Set up Pht client
         self.pht_client = pht_client
@@ -69,6 +64,14 @@ class TrainBuilder:
         login_result = self.docker_client.login(username=os.getenv("HARBOR_USER"), password=os.getenv("HARBOR_PW"),
                                                 registry=self.registry_url)
         logger.info(f"Login result -- {login_result['Status']}")
+
+        logger.info("Initializing vault client")
+        self.vault_client = Client(
+            url=os.getenv("VAULT_URL"),
+            token=os.getenv("VAULT_TOKEN")
+        )
+
+        logger.info("Vault client initialized")
 
         logger.info("Requesting service token")
         self._get_service_token()
@@ -357,14 +360,11 @@ class TrainBuilder:
         :return:
         """
 
-        if self.vault_url[-1] != "/":
-            self.vault_url = self.vault_url + "/"
-        url = self.vault_url + "v1/services/TRAIN_BUILDER"
-        headers = {"X-Vault-Token": self.vault_token}
-        r = requests.get(url=url, headers=headers)
-        r.raise_for_status()
-
-        client_data = r.json()["data"]
+        secret = self.vault_client.secrets.kv.v1.read_secret(
+            path="TRAIN_BUILDER",
+            mount_point="services"
+        )
+        client_data = secret["data"]
         self.service_key = client_data["clientSecret"]
         self.client_id = client_data["clientId"]
 

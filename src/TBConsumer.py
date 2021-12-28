@@ -4,7 +4,7 @@ import json
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
-from src.TrainBuilder import TrainBuilder, BuildStatus
+from TrainBuilder import TrainBuilder, BuildStatus
 from loguru import logger
 
 LOGGER = logging.getLogger(__name__)
