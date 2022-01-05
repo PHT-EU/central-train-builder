@@ -4,7 +4,7 @@ import json
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
-from TrainBuilder import TrainBuilder, BuildStatus
+from builder.TrainBuilder import TrainBuilder, BuildStatus
 from loguru import logger
 
 LOGGER = logging.getLogger(__name__)
@@ -14,7 +14,6 @@ class TBConsumer(Consumer):
 
     def __init__(self, amqp_url: str, queue: str = "", public_key_path: str = None, routing_key: str = None):
         super().__init__(amqp_url, queue, routing_key=routing_key)
-
         api_url = os.getenv("UI_TRAIN_API")
         if api_url[-1] != "/":
             api_url += "/"

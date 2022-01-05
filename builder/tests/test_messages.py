@@ -1,6 +1,6 @@
 import json
 import pytest
-from src.messages import BuildMessage
+from builder.messages import BuildMessage
 
 
 @pytest.fixture

@@ -14,6 +14,6 @@ COPY Pipfile.lock /opt/train-builder/Pipfile.lock
 
 RUN pipenv install --system --deploy --ignore-pipfile
 RUN pip install git+https://github.com/PHT-Medic/train-container-library.git
-COPY ./src /home/src
+COPY builder /home/src
 
 CMD ["python", "-u", "/home/src/TBConsumer.py"]

@@ -1,7 +1,7 @@
 import base64
 import os
 import tarfile
-from enum import Enum
+
 from typing import List
 import docker
 import redis
@@ -19,38 +19,56 @@ from requests import HTTPError
 
 from train_lib.clients import PHTClient
 
+from builder.messages import QueueMessage, BuilderCommands, BuildMessage
+from tb_store import BuildStatus, BuilderRedisStore
+
 LOGGER = logging.getLogger(__name__)
 
 
-class BuildStatus(Enum):
-    STARTED = "trainBuildStarted"
-    FAILED = "trainBuildFailed"
-    FINISHED = "trainBuildFinished"
-    NOT_FOUND = "trainNotFound"
-    STOPPED = "trainBuildStopped"
-
-
 class TrainBuilder:
+    vault_url: str
+    vault_token: str
+    registry_url: str
+    harbor_user: str
+    harbor_password: str
+    redis_host: str
 
-    def __init__(self, pht_client: PHTClient):
+    docker_client: docker.DockerClient
+    vault_client: Client = None
+    redis_client: redis.Redis = None
+    redis_store: BuilderRedisStore = None
+
+    def __init__(self):
         load_dotenv(find_dotenv())
-        self.vault_url = os.getenv("VAULT_URL")
-        self.vault_token = os.getenv("VAULT_TOKEN")
-        self.registry_url = os.getenv("HARBOR_URL")
-        self.redis = None
-        self.docker_client = None
-        # Setup redis and docker client
-        self.service_key = None
-        self.client_id = None
-        self.api_url = None
-        self.vault_client = None
         # Run setup
         self._setup()
 
         assert self.vault_url and self.vault_token and self.registry_url
 
-        # Set up Pht client
-        self.pht_client = pht_client
+
+    def process_message(self, msg: dict):
+
+        logger.info(f"Processing message: {msg}")
+        command_type = msg["type"]
+        train_id = msg.get("data").get("trainId")
+        if not train_id:
+            logger.error("Train id not found in message")
+            # todo return error message
+
+        if command_type == BuilderCommands.START.value:
+            build_message = BuildMessage(**msg)
+            # todo start build
+
+        if command_type == BuilderCommands.STOP.value:
+            # todo stop build
+            pass
+        elif command_type == BuilderCommands.STATUS.value:
+            # todo get build status
+            if self.redis_store.train_exists(train_id):
+                status = self.redis_store.get_build_status(train_id=train_id)
+            else:
+                status = BuildStatus.NOT_FOUND
+
 
     def _setup(self):
         """
@@ -61,14 +79,26 @@ class TrainBuilder:
         # Connect to redis either in docker-compose container or on localhost
         logger.info("Initializing docker client and logging into registry")
         self.docker_client = docker.client.from_env()
-        login_result = self.docker_client.login(username=os.getenv("HARBOR_USER"), password=os.getenv("HARBOR_PW"),
+        self.harbor_user = os.getenv("HARBOR_USER")
+        self.harbor_password = os.getenv("HARBOR_PW")
+
+        if not self.harbor_user and self.harbor_password:
+            raise ValueError("Harbor user and password must be set in environment variables -> HARBOR_USER + HARBOR_PW")
+
+        login_result = self.docker_client.login(username=self.harbor_user, password=self.harbor_password,
                                                 registry=self.registry_url)
         logger.info(f"Login result -- {login_result['Status']}")
 
         logger.info("Initializing vault client")
+
+        self.vault_url = os.getenv("VAULT_URL")
+        self.vault_token = os.getenv("VAULT_TOKEN")
+
+        if not self.vault_url and self.vault_token:
+            raise ValueError("Vault url and token must be set in environment variables -> VAULT_URL + VAULT_TOKEN")
         self.vault_client = Client(
-            url=os.getenv("VAULT_URL"),
-            token=os.getenv("VAULT_TOKEN")
+            url=self.vault_url,
+            token=self.vault_token
         )
 
         logger.info("Vault client initialized")
@@ -80,7 +110,9 @@ class TrainBuilder:
         self.api_url = os.getenv("UI_TRAIN_API")
 
         logger.info("Connecting to redis")
-        self.redis = redis.Redis(host=os.getenv("REDIS_HOST", None), decode_responses=True)
+        self.redis_host = os.getenv("REDIS_HOST")
+        self.redis = redis.Redis(host=self.redis_host, decode_responses=True)
+        logger.info("Redis connection established")
         logger.info("Validating setup")
         self._validate_setup()
         logger.info("Setup complete")
@@ -248,7 +280,7 @@ class TrainBuilder:
 
         logger.info(f"Train: {build_data['trainId']} -- Generating train config")
 
-        user_public_key = self.pht_client.get_user_pk(build_data["userId"])
+        user_public_key = self.pht_client.get_user_public_key(build_data["userId"])
 
         station_public_keys = self.pht_client.get_multiple_station_pks(build_data["stations"])
         registry = os.getenv("HARBOR_URL").split("//")[-1]

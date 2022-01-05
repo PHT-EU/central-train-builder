@@ -1,13 +1,30 @@
 import json
 from pydantic import BaseModel, StrBytes, Protocol
 from typing import Union, List, Type, Optional, Callable, Any
+from enum import Enum
 
 
-class BuildMessage(BaseModel):
-    message_id: Optional[str] = None
+class BuilderCommands(Enum):
+    START = "trainBuildStart"
+    STOP = "trainBuildStop"
+    STATUS = "trainBuildStatus"
+
+
+class BuildStatus(Enum):
+    STARTED = "trainBuildStarted"
+    FAILED = "trainBuildFailed"
+    FINISHED = "trainBuildFinished"
+    NOT_FOUND = "trainNotFound"
+    STOPPED = "trainBuildStopped"
+
+
+class QueueMessage(BaseModel):
     type: str
-    metadata: dict
     data: dict
+    metadata: dict
+
+
+class BuildMessage(QueueMessage):
     train_id: str
     proposal_id: int
     stations: List[str]
@@ -24,7 +41,6 @@ class BuildMessage(BaseModel):
     @classmethod
     def parse_raw(cls: Type['BuildMessage'], b: StrBytes, *, content_type: str = None, encoding: str = 'utf8',
                   proto: Protocol = None, allow_pickle: bool = False) -> 'BuildMessage':
-
         if content_type == "str" and encoding != "utf8":
             return cls.from_json(b.encode(encoding))
 
@@ -37,7 +53,7 @@ class BuildMessage(BaseModel):
         return cls(
             message_id=message_dict.get("id"),
             type=message_dict.get("type"),
-            data=message_dict.get("data"),
+            data=data,
             metadata=message_dict.get("metadata"),
             train_id=data["trainId"],
             proposal_id=data["proposalId"],
