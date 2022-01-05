@@ -52,6 +52,16 @@ class TBConsumer(Consumer):
 
         if action in ["trainBuildStart", "trainBuild"]:
             logger.info("Received build command")
+            build_started_message = {
+                "type": BuildStatus.STARTED.value,
+                "data": {
+                    "trainId": data["trainId"],
+                }
+            }
+            self.pht_client.publish_message_rabbit_mq(
+                build_started_message,
+                routing_key="ui.tb.event"
+            )
             code, build_message = self.builder.build_train(data, meta_data)
             if code == 0:
                 # Post updates for tr to get the route from vault
@@ -110,9 +120,9 @@ class TBConsumer(Consumer):
     @staticmethod
     def _make_response(message, code, build_message):
         if code == 0:
-            message["type"] = "trainBuilt"
+            message["type"] = BuildStatus.FINISHED
         else:
-            message["type"] = "trainBuildFailed"
+            message["type"] = BuildStatus.FAILED
         message["data"]["buildMessage"] = build_message
 
         return message
