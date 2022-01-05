@@ -43,7 +43,7 @@ class TBConsumer(Consumer):
             # print(json.dumps(message, indent=2))
         except:
             self.pht_client.publish_message_rabbit_mq(
-                {"type": "trainBuildFailed", "data": {"message": "Malformed JSON"}},
+                {"type": BuildStatus.FAILED.value, "data": {"message": "Malformed JSON"}},
                 routing_key="ui.tb.event")
             super().on_message(_unused_channel, basic_deliver, properties, body)
             return
@@ -120,9 +120,9 @@ class TBConsumer(Consumer):
     @staticmethod
     def _make_response(message, code, build_message):
         if code == 0:
-            message["type"] = BuildStatus.FINISHED
+            message["type"] = BuildStatus.FINISHED.value
         else:
-            message["type"] = BuildStatus.FAILED
+            message["type"] = BuildStatus.FAILED.value
         message["data"]["buildMessage"] = build_message
 
         return message
