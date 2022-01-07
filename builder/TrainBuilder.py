@@ -18,10 +18,10 @@ from hvac import Client
 from requests import HTTPError
 
 from train_lib.clients import PHTClient
-from train_lib.security.train_config import TrainConfig, HexString
+from train_lib.security.train_config import TrainConfig, HexString, UserPublicKeys, StationPublicKeys
 
 from builder.messages import QueueMessage, BuilderCommands, BuildMessage
-from builder.tb_store import BuildStatus, BuilderRedisStore
+from builder.tb_store import BuildStatus, BuilderRedisStore, BuilderVaultStore
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ class TrainBuilder:
 
     docker_client: docker.DockerClient
     vault_client: Client = None
+    vault_store: BuilderVaultStore = None
     redis_client: redis.Redis = None
     redis_store: BuilderRedisStore = None
 
@@ -98,7 +99,7 @@ class TrainBuilder:
                                                 registry=self.registry_url)
         logger.info(f"Login result -- {login_result['Status']}")
 
-        logger.info("Initializing vault client")
+        logger.info("Initializing vault client & store")
 
         self.vault_url = os.getenv("VAULT_URL")
         self.vault_token = os.getenv("VAULT_TOKEN")
@@ -109,6 +110,7 @@ class TrainBuilder:
             url=self.vault_url,
             token=self.vault_token
         )
+        self.vault_store = BuilderVaultStore(self.vault_client)
 
         logger.info("Vault client initialized")
 
@@ -136,8 +138,46 @@ class TrainBuilder:
         logger.info(f"Image built - {image.id}")
         logger.debug(f"Logs - {logs}")
 
-    def generate_config(self, build_message: BuildMessage):
-        pass
+    def generate_config(self, build_message: BuildMessage) -> TrainConfig:
+
+        logger.info(f"Generating config for Train {build_message.train_id}")
+        config = TrainConfig.construct()
+
+        # transcribe values from build message
+        config.train_id = build_message.train_id
+        config.master_image = build_message.master_image
+        config.user_id = build_message.user_id
+        config.immutable_file_list = build_message.files
+        config.immutable_file_hash = build_message.hash
+        config.immutable_file_signature = build_message.hash_signed
+
+        # get the station and user keys
+        config.user_keys = self._get_user_keys(build_message.user_id)
+        config.station_public_keys = self._get_public_keys_for_stations(build_message.stations)
+
+        return config
+
+    def _get_user_keys(self, user_id: str) -> UserPublicKeys:
+        vault_key = self.vault_store.get_user_public_key(user_id)
+
+        user_keys = UserPublicKeys(
+            user_id=user_id,
+            paillier_public_key=vault_key.paillier_public_key,
+            rsa_public_key=vault_key.rsa_public_key,
+        )
+        return user_keys
+
+    def _get_public_keys_for_stations(self, station_ids: List[str]) -> List[StationPublicKeys]:
+        station_pks = []
+        vault_keys = self.vault_store.get_station_public_keys(station_ids)
+        for key in vault_keys:
+            station_pks.append(
+                StationPublicKeys(
+                    station_id=key.station_id,
+                    rsa_public_key=key.rsa_station_public_key,
+                )
+            )
+        return station_pks
 
     def _make_master_image_tag(self, master_image: str):
         return f"{self.registry_domain}/{master_image}"

@@ -10,12 +10,12 @@ from builder.messages import BuildMessage, BuildStatus, BuilderCommands
 
 @pytest.fixture
 def test_user_id():
-    return 99999999
+    return "tb-test-user"
 
 
 @pytest.fixture
 def test_station_ids():
-    return [f"tb-test-station- {i + 1}" for i in range(3)]
+    return [f"tb-test-station-{i + 1}" for i in range(3)]
 
 
 @pytest.fixture
@@ -144,6 +144,25 @@ def test_generate_config(builder, build_msg):
         secret=user_secrets
     )
 
+    for station_id in build_msg.stations:
+        station_secret = {
+            "rsa_station_public_key": station_id.encode().hex(),
+        }
+        response = builder.vault_client.secrets.kv.v1.create_or_update_secret(
+            path=station_id,
+            mount_point="station_pks",
+            secret=station_secret
+        )
+        print(response.text)
+
+    config = builder.generate_config(build_msg)
+
+    assert config.user_keys.rsa_public_key == user_secrets["rsa_public_key"]
+
+    assert config
+
+
 
 def test_build(builder, build_msg):
     pass
+

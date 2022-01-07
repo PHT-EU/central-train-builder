@@ -43,7 +43,7 @@ class BuilderVaultStore:
     def get_station_public_key(self, station_id: str) -> VaultStationPublicKey:
         station_pk = self.client.secrets.kv.v1.read_secret(
             path=station_id,
-            mount_point="user_pks",
+            mount_point="station_pks",
         )
         return VaultStationPublicKey(station_id=station_id, **station_pk["data"])
 
