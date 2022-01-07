@@ -21,7 +21,6 @@ def vault_client() -> Client:
     load_dotenv(find_dotenv())
     vault_url = os.getenv('VAULT_URL')
     vault_token = os.getenv('VAULT_TOKEN')
-    print(f"VAULT_URL: {vault_url}, VAULT_TOKEN: {vault_token}")
     client = Client(vault_url, token=vault_token)
     return client
 
@@ -54,5 +53,32 @@ def test_vault_store_get_user_pk(vault_store, vault_client):
         mount_point="user_pks"
     )
 
+
 def test_vault_store_get_multiple_user_pks(vault_store, vault_client):
-    pass
+    # create user secrets
+
+    user_ids = []
+    for i in range(3):
+        user_id = f'tb-test-user-{i}'
+        user_ids.append(user_id)
+        test_user_pk = {
+            "rsa_public_key": f"public_key-{i}",
+            "paillier_public_key": f"paillier_key-{i}"
+        }
+        vault_client.secrets.kv.v1.create_or_update_secret(
+            path=user_id,
+            mount_point="user_pks",
+            secret=test_user_pk
+        )
+
+    user_pks = vault_store.get_user_public_keys(user_ids=user_ids)
+
+    assert user_pks[0].user_id == user_ids[0]
+    assert len(user_pks) == 3
+
+    # delete generated secrets after use
+    for user_id in user_ids:
+        vault_client.secrets.kv.v1.delete_secret(
+            path=user_id,
+            mount_point="user_pks"
+        )

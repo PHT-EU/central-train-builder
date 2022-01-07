@@ -45,7 +45,6 @@ class BuilderVaultStore:
             path=station_id,
             mount_point="user_pks",
         )
-        print(station_pk)
         return VaultStationPublicKey(station_id=station_id, **station_pk["data"])
 
     def get_station_public_keys(self, station_ids: List[str]) -> List[VaultStationPublicKey]:

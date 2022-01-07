@@ -18,6 +18,7 @@ from hvac import Client
 from requests import HTTPError
 
 from train_lib.clients import PHTClient
+from train_lib.security.train_config import TrainConfig, HexString
 
 from builder.messages import QueueMessage, BuilderCommands, BuildMessage
 from builder.tb_store import BuildStatus, BuilderRedisStore
@@ -135,10 +136,8 @@ class TrainBuilder:
         logger.info(f"Image built - {image.id}")
         logger.debug(f"Logs - {logs}")
 
-
     def generate_config(self, build_message: BuildMessage):
         pass
-
 
     def _make_master_image_tag(self, master_image: str):
         return f"{self.registry_domain}/{master_image}"

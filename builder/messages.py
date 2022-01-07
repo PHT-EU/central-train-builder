@@ -26,6 +26,7 @@ class QueueMessage(BaseModel):
 
 class BuildMessage(QueueMessage):
     train_id: str
+    user_id: Union[str, int]
     proposal_id: int
     stations: List[str]
     files: List[str]
@@ -56,6 +57,7 @@ class BuildMessage(QueueMessage):
             data=data,
             metadata=message_dict.get("metadata"),
             train_id=data["trainId"],
+            user_id=data["userId"],
             proposal_id=data["proposalId"],
             stations=data["stations"],
             files=data["files"],
