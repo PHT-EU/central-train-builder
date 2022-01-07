@@ -20,7 +20,7 @@ from requests import HTTPError
 from train_lib.clients import PHTClient
 
 from builder.messages import QueueMessage, BuilderCommands, BuildMessage
-from tb_store import BuildStatus, BuilderRedisStore
+from builder.tb_store import BuildStatus, BuilderRedisStore
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ class TrainBuilder:
     vault_url: str
     vault_token: str
     registry_url: str
+    registry_domain: str
     harbor_user: str
     harbor_password: str
     redis_host: str
@@ -45,30 +46,32 @@ class TrainBuilder:
 
         assert self.vault_url and self.vault_token and self.registry_url
 
-
     def process_message(self, msg: dict):
 
-        logger.info(f"Processing message: {msg}")
-        command_type = msg["type"]
-        train_id = msg.get("data").get("trainId")
+        message = QueueMessage(**msg)
+
+        logger.info(f"Processing message: {message}")
+        train_id = message.data.get("trainId")
         if not train_id:
             logger.error("Train id not found in message")
+            status = BuildStatus.NOT_FOUND
             # todo return error message
 
-        if command_type == BuilderCommands.START.value:
+        if message.type == BuilderCommands.START:
             build_message = BuildMessage(**msg)
             # todo start build
-
-        if command_type == BuilderCommands.STOP.value:
+        elif message.type == BuilderCommands.STOP:
             # todo stop build
             pass
-        elif command_type == BuilderCommands.STATUS.value:
-            # todo get build status
+
+        elif message.type == BuilderCommands.STATUS:
+
             if self.redis_store.train_exists(train_id):
                 status = self.redis_store.get_build_status(train_id=train_id)
             else:
                 status = BuildStatus.NOT_FOUND
 
+        # todo make response
 
     def _setup(self):
         """
@@ -79,6 +82,11 @@ class TrainBuilder:
         # Connect to redis either in docker-compose container or on localhost
         logger.info("Initializing docker client and logging into registry")
         self.docker_client = docker.client.from_env()
+        self.registry_url = os.getenv("HARBOR_URL")
+        self.registry_domain = self.registry_url.split("//")[1]
+        if not self.registry_url:
+            raise ValueError("HARBOR_URL not set")
+
         self.harbor_user = os.getenv("HARBOR_USER")
         self.harbor_password = os.getenv("HARBOR_PW")
 
@@ -117,6 +125,36 @@ class TrainBuilder:
         self._validate_setup()
         logger.info("Setup complete")
 
+    def build(self, build_message: BuildMessage):
+
+        logger.info(f"Ensuring master image - {build_message.master_image} is available...")
+        master_image_repo = self._make_master_image_tag(build_message.master_image)
+        self.docker_client.images.pull(master_image_repo, tag="latest")
+
+        image, logs = self._build_image(build_message)
+        logger.info(f"Image built - {image.id}")
+        logger.debug(f"Logs - {logs}")
+
+
+    def generate_config(self, build_message: BuildMessage):
+        pass
+
+
+    def _make_master_image_tag(self, master_image: str):
+        return f"{self.registry_domain}/{master_image}"
+
+    def _build_image(self, build_message: BuildMessage):
+
+        logger.info(f"Building base image for Train - {build_message.train_id}")
+        docker_file_obj = self._make_dockerfile(
+            master_image=build_message.master_image,
+            command_args=build_message.entrypoint_args,
+            entrypoint_file=build_message.entrypoint_path,
+            command=build_message.entrypoint_executable,
+        )
+        image, logs = self.docker_client.images.build(fileobj=docker_file_obj)
+        return image, logs
+
     def build_train(self, build_data: dict, meta_data: dict):
         """
         Builds the train based two dictionaries containing build and metadata
@@ -139,7 +177,7 @@ class TrainBuilder:
             command_args=build_data["entrypointCommandArguments"],
             entrypoint_file=build_data["entrypointPath"])
 
-        logger.info(f"Train: {build_data['trainId']} -- Building base image")
+        logger.info(f"Train: {build_data['trainId']} -- Building image")
         # Build the image based on the specifications passed in the message
         image, logs = self.docker_client.images.build(fileobj=docker_file_obj)
         # Start a temporary container
@@ -363,9 +401,11 @@ class TrainBuilder:
         self.docker_client.images.remove(repo + ":base", noprune=False, force=True)
         self.docker_client.images.remove(repo + ":latest", noprune=False, force=True)
 
-    @staticmethod
-    def _make_dockerfile(master_image: str, command: str, entrypoint_file: str, command_args: List[str] = None):
-        registry = os.getenv("HARBOR_URL").split("//")[-1]
+    def _make_dockerfile(self, master_image: str, command: str, entrypoint_file: str, command_args: List[str] = None):
+
+        train_dir = "/opt/pht_train"
+        results_dir = "/opt/pht_results"
+
         if command_args:
             docker_command_args = [f'"{arg}"' for arg in command_args]
             docker_command_args = ", ".join(docker_command_args) + ", "
@@ -374,13 +414,20 @@ class TrainBuilder:
 
         if entrypoint_file[:2] == "./":
             entrypoint_file = entrypoint_file[2:]
-        docker_file = f'''
-            FROM {registry}/master/{master_image}
-            RUN mkdir /opt/pht_results
-            RUN mkdir /opt/pht_train
-            RUN chmod -R +x /opt/pht_train
-            CMD ["{command}", {docker_command_args} "/opt/pht_train/{entrypoint_file}"]
-            '''
+
+        docker_from = f"FROM {self.registry_domain}/master/{master_image}\n"
+        directory_setup = f"RUN mkdir {train_dir} && mkdir {results_dir} && chmod -R +x {train_dir} \n"
+        docker_command = f'CMD ["{command}", {docker_command_args}"/opt/pht_train/{entrypoint_file}"]\n'
+
+        docker_file = docker_from + directory_setup + docker_command
+
+        # docker_file = f'''
+        #     FROM {self.registry_domain}/master/{master_image}
+        #     RUN mkdir /opt/pht_results
+        #     RUN mkdir /opt/pht_train
+        #     RUN chmod -R +x /opt/pht_train
+        #     CMD ["{command}", {docker_command_args}, "/opt/pht_train/{entrypoint_file}"]
+        #     '''
         file_obj = BytesIO(docker_file.encode("utf-8"))
 
         return file_obj

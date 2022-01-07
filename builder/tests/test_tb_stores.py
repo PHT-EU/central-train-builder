@@ -53,3 +53,6 @@ def test_vault_store_get_user_pk(vault_store, vault_client):
         path=user_id,
         mount_point="user_pks"
     )
+
+def test_vault_store_get_multiple_user_pks(vault_store, vault_client):
+    pass

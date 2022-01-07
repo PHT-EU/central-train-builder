@@ -31,7 +31,6 @@ class BuilderVaultStore:
             path=user_id,
             mount_point="user_pks",
         )
-        print(user_pk)
         return VaultUserPublicKey(user_id=user_id, **user_pk["data"])
 
     def get_user_public_keys(self, user_ids: List[str]) -> List[VaultUserPublicKey]:

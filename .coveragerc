@@ -1,10 +1,10 @@
 [run]
 source =
-    src
+    builder
 
 [paths]
 source =
-    src
+    builder
 
 [report]
 show_missing = true

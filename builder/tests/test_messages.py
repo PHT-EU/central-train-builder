@@ -7,7 +7,7 @@ from builder.messages import BuildMessage
 def build_message():
     return {
         "id": "f54f58d9-58a1-4141-9dfb-a48b2a275998",
-        "type": "trainBuild",
+        "type": "trainBuildStart",
         "metadata": {},
         "data": {
             "userId": 5,
@@ -36,7 +36,7 @@ def build_message():
 def build_message_query():
     return {
         "id": "f54f58d9-58a1-4141-9dfb-a48b2a275998",
-        "type": "trainBuild",
+        "type": "trainBuildStart",
         "metadata": {},
         "data": {
             "userId": 5,

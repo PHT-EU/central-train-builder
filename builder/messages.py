@@ -4,13 +4,13 @@ from typing import Union, List, Type, Optional, Callable, Any
 from enum import Enum
 
 
-class BuilderCommands(Enum):
+class BuilderCommands(str, Enum):
     START = "trainBuildStart"
     STOP = "trainBuildStop"
     STATUS = "trainBuildStatus"
 
 
-class BuildStatus(Enum):
+class BuildStatus(str, Enum):
     STARTED = "trainBuildStarted"
     FAILED = "trainBuildFailed"
     FINISHED = "trainBuildFinished"
@@ -19,7 +19,7 @@ class BuildStatus(Enum):
 
 
 class QueueMessage(BaseModel):
-    type: str
+    type: BuilderCommands
     data: dict
     metadata: dict
 
@@ -32,6 +32,7 @@ class BuildMessage(QueueMessage):
     master_image: str
     entrypoint_executable: str
     entrypoint_path: str
+    entrypoint_args: Optional[List[str]]
     session_id: str
     hash: str
     hash_signed: str
@@ -51,7 +52,6 @@ class BuildMessage(QueueMessage):
         message_dict = load_json_dict(json_message)
         data = message_dict.get("data")
         return cls(
-            message_id=message_dict.get("id"),
             type=message_dict.get("type"),
             data=data,
             metadata=message_dict.get("metadata"),
@@ -61,12 +61,14 @@ class BuildMessage(QueueMessage):
             files=data["files"],
             master_image=data["masterImage"],
             entrypoint_executable=data["entrypointExecutable"],
+            entrypoint_args=data.get("entrypointCommandArguments"),
             entrypoint_path=data["entrypointPath"],
             session_id=data["sessionId"],
             hash=data["hash"],
             hash_signed=data["hashSigned"],
             query=data.get("query"),
             user_he_key=data.get("user_he_key")
+
         )
 
 
