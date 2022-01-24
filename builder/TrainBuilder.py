@@ -1,6 +1,7 @@
 import base64
 import os
 import tarfile
+from enum import Enum
 
 from typing import List
 import docker
@@ -15,15 +16,21 @@ from dotenv import load_dotenv, find_dotenv
 import logging
 from loguru import logger
 from hvac import Client
+from pydantic import ValidationError
 from requests import HTTPError
 
 from train_lib.clients import PHTClient
 from train_lib.security.train_config import TrainConfig, HexString, UserPublicKeys, StationPublicKeys
 
-from builder.messages import QueueMessage, BuilderCommands, BuildMessage
+from builder.messages import QueueMessage, BuilderCommands, BuildMessage, BuilderResponse
 from builder.tb_store import BuildStatus, BuilderRedisStore, BuilderVaultStore
 
 LOGGER = logging.getLogger(__name__)
+
+
+class TrainDirectories(Enum):
+    TRAIN_DIR = "/opt/pht_train"
+    RESULTS_DIR = "/opt/pht_results"
 
 
 class TrainBuilder:
@@ -48,30 +55,38 @@ class TrainBuilder:
 
         assert self.vault_url and self.vault_token and self.registry_url
 
-    def process_message(self, msg: dict):
+    def process_message(self, msg: dict) -> BuilderResponse:
 
         message = QueueMessage(**msg)
 
         logger.info(f"Processing message: {message}")
-        train_id = message.data.get("trainId")
+        train_id = message.data.get("id")
         if not train_id:
             logger.error("Train id not found in message")
             status = BuildStatus.NOT_FOUND
+            return BuilderResponse(type=status)
             # todo return error message
 
         if message.type == BuilderCommands.START:
-            build_message = BuildMessage(**msg)
+            try:
+                build_message = BuildMessage(**msg)
+            except ValidationError as e:
+                logger.error(f"Invalid build message: {e}")
+                status = BuildStatus.FAILED
+                return BuilderResponse(type=status, data={"id": train_id, "message": "invalid build message"})
+            result = self.build(build_message)
             # todo start build
         elif message.type == BuilderCommands.STOP:
             # todo stop build
             pass
 
         elif message.type == BuilderCommands.STATUS:
-
             if self.redis_store.train_exists(train_id):
                 status = self.redis_store.get_build_status(train_id=train_id)
             else:
                 status = BuildStatus.NOT_FOUND
+
+            return BuilderResponse(type=status)
 
         # todo make response
 
@@ -123,7 +138,9 @@ class TrainBuilder:
         logger.info("Connecting to redis")
         self.redis_host = os.getenv("REDIS_HOST")
         self.redis = redis.Redis(host=self.redis_host, decode_responses=True)
-        logger.info("Redis connection established")
+        logger.info("Redis connection established. Setting up store...")
+        self.redis_store = BuilderRedisStore(self.redis)
+        logger.info("Redis store initialized")
         logger.info("Validating setup")
         self._validate_setup()
         logger.info("Setup complete")
@@ -140,11 +157,11 @@ class TrainBuilder:
 
     def generate_config(self, build_message: BuildMessage) -> TrainConfig:
 
-        logger.info(f"Generating config for Train {build_message.train_id}")
+        logger.info(f"Generating config for Train {build_message.id}")
         config = TrainConfig.construct()
 
         # transcribe values from build message
-        config.train_id = build_message.train_id
+        config.train_id = build_message.id
         config.master_image = build_message.master_image
         config.user_id = build_message.user_id
         config.immutable_file_list = build_message.files
@@ -152,14 +169,17 @@ class TrainBuilder:
         config.immutable_file_signature = build_message.hash_signed
 
         # get the station and user keys
-        config.user_keys = self._get_user_keys(build_message.user_id)
+        config.user_keys = self._get_user_keys(
+            user_id=build_message.user_id,
+            rsa_key_id=build_message.user_rsa_secret_id,
+            pallier_key_id=build_message.user_paillier_secret_id
+        )
         config.station_public_keys = self._get_public_keys_for_stations(build_message.stations)
 
         return config
 
-    def _get_user_keys(self, user_id: str) -> UserPublicKeys:
-        vault_key = self.vault_store.get_user_public_key(user_id)
-
+    def _get_user_keys(self, user_id: str, rsa_key_id: str, pallier_key_id: str = None) -> UserPublicKeys:
+        vault_key = self.vault_store.get_user_public_key(user_id, rsa_key_id, pallier_key_id)
         user_keys = UserPublicKeys(
             user_id=user_id,
             paillier_public_key=vault_key.paillier_public_key,
@@ -174,7 +194,7 @@ class TrainBuilder:
             station_pks.append(
                 StationPublicKeys(
                     station_id=key.station_id,
-                    rsa_public_key=key.rsa_station_public_key,
+                    rsa_public_key=key.rsa_public_key,
                 )
             )
         return station_pks
@@ -442,8 +462,8 @@ class TrainBuilder:
 
     def _make_dockerfile(self, master_image: str, command: str, entrypoint_file: str, command_args: List[str] = None):
 
-        train_dir = "/opt/pht_train"
-        results_dir = "/opt/pht_results"
+        train_dir = TrainDirectories.TRAIN_DIR.value
+        results_dir = TrainDirectories.RESULTS_DIR.value
 
         if command_args:
             docker_command_args = [f'"{arg}"' for arg in command_args]

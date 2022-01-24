@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional, Union, Callable, Any
 from redis import Redis
 from loguru import logger
 from enum import Enum
@@ -8,15 +8,28 @@ from pydantic import BaseModel
 from builder.messages import BuildStatus
 
 
+class VaultEngines(Enum):
+    USERS = "user-secrets"
+    STATIONS = "stations"
+    ROUTES = "routes"
+
+
 class VaultUserPublicKey(BaseModel):
     user_id: str
     rsa_public_key: str
-    paillier_public_key: str
+    paillier_public_key: Optional[str] = None
 
 
 class VaultStationPublicKey(BaseModel):
     station_id: str
-    rsa_station_public_key: str
+    rsa_public_key: str
+
+
+class VaultRoute(BaseModel):
+    repository_suffix: str
+    stations: List[str]
+    periodic: Optional[bool] = False
+    epochs: Optional[int] = None
 
 
 class BuilderVaultStore:
@@ -25,33 +38,50 @@ class BuilderVaultStore:
     def __init__(self, vault_client: Client):
         self.client = vault_client
 
-    def get_user_public_key(self, user_id: str) -> VaultUserPublicKey:
+    def get_user_public_key(self, user_id: str, rsa_key_id: str, paillier_key_id: str = None) -> VaultUserPublicKey:
         # get data from vault
         user_pk = self.client.secrets.kv.v1.read_secret(
             path=user_id,
-            mount_point="user_pks",
+            mount_point=VaultEngines.USERS.value,
         )
-        return VaultUserPublicKey(user_id=user_id, **user_pk["data"])
 
-    def get_user_public_keys(self, user_ids: List[str]) -> List[VaultUserPublicKey]:
-        user_pks = []
-        for user_id in user_ids:
-            user_pks.append(self.get_user_public_key(user_id))
+        return VaultUserPublicKey(
+            user_id=user_id,
+            rsa_public_key=user_pk["data"].get(rsa_key_id),
+            paillier_public_key=user_pk["data"].get(paillier_key_id))
 
-        return user_pks
+    # def get_user_public_keys(self, user_ids: List[str]) -> List[VaultUserPublicKey]:
+    #     user_pks = []
+    #     for user_id in user_ids:
+    #         user_pks.append(self.get_user_public_key(user_id))
+    #
+    #     return user_pks
 
     def get_station_public_key(self, station_id: str) -> VaultStationPublicKey:
         station_pk = self.client.secrets.kv.v1.read_secret(
             path=station_id,
-            mount_point="station_pks",
+            mount_point=VaultEngines.STATIONS.value,
         )
-        return VaultStationPublicKey(station_id=station_id, **station_pk["data"])
+        rsa_public_key = station_pk["data"].get("rsa_public_key")
+        return VaultStationPublicKey(station_id=station_id, rsa_public_key=rsa_public_key)
 
     def get_station_public_keys(self, station_ids: List[str]) -> List[VaultStationPublicKey]:
         station_pks = []
         for station_id in station_ids:
             station_pks.append(self.get_station_public_key(station_id))
         return station_pks
+
+    def add_route(self, train_id: str, route: VaultRoute):
+        json_secret = route.dict()
+        # todo improve this
+        json_secret["repositorySuffix"] = route.repository_suffix
+        del json_secret["repository_suffix"]
+        response = self.client.secrets.kv.v1.create_or_update_secret(
+            mount_point=VaultEngines.ROUTES.value,
+            path=train_id,
+            secret=json_secret,
+        )
+        print(response)
 
 
 class BuilderRedisStore:

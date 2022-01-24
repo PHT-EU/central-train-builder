@@ -1,4 +1,5 @@
 import os
+import pprint
 
 import pytest
 from dotenv import load_dotenv, find_dotenv
@@ -6,6 +7,7 @@ from hvac import Client
 
 from builder.TrainBuilder import TrainBuilder
 from builder.messages import BuildMessage, BuildStatus, BuilderCommands
+from builder.tb_store import VaultEngines
 
 
 @pytest.fixture
@@ -26,9 +28,11 @@ def build_msg(test_user_id, test_station_ids):
         "metadata": {},
         "data": {
             "userId": test_user_id,
-            "trainId": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
-            "proposalId": 9999,
+            "id": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
+            "proposalId": "9999",
             "stations": test_station_ids,
+            "userPaillierSecretId": "paillier_public_key",
+            "userRsaSecretId": "rsa_public_key",
             "files": [
                 "test_train/entrypoint.py",
                 "test_train/requirements.txt"
@@ -131,6 +135,36 @@ def test_make_docker_file(builder):
     print(image, list(logs))
 
 
+def test_process_status_message(builder):
+    train_id = "tb-test-train-id"
+    builder._setup()
+    builder.redis_store.set_build_status(train_id=train_id, status=BuildStatus.STARTED)
+    message = {
+        "type": "trainBuildStatus",
+        "data": {
+            "id": train_id,
+        }
+    }
+
+    response = builder.process_message(message)
+
+    assert response.type == BuildStatus.STARTED
+
+    # train not found
+    message = {
+        "type": "trainBuildStatus",
+        "data": {
+            "id": "wrong-id",
+        }
+    }
+
+    response = builder.process_message(message)
+    assert response.type == BuildStatus.NOT_FOUND
+
+
+
+
+
 def test_generate_config(builder, build_msg):
     # generate test user and secrets in vault
     user_secrets = {
@@ -140,17 +174,17 @@ def test_generate_config(builder, build_msg):
 
     builder.vault_client.secrets.kv.v1.create_or_update_secret(
         path=str(build_msg.user_id),
-        mount_point="user_pks",
+        mount_point=VaultEngines.USERS.value,
         secret=user_secrets
     )
 
     for station_id in build_msg.stations:
         station_secret = {
-            "rsa_station_public_key": station_id.encode().hex(),
+            "rsa_public_key": station_id.encode().hex(),
         }
         response = builder.vault_client.secrets.kv.v1.create_or_update_secret(
             path=station_id,
-            mount_point="station_pks",
+            mount_point=VaultEngines.STATIONS.value,
             secret=station_secret
         )
         print(response.text)
@@ -162,7 +196,5 @@ def test_generate_config(builder, build_msg):
     assert config
 
 
-
 def test_build(builder, build_msg):
     pass
-

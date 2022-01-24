@@ -20,14 +20,22 @@ class BuildStatus(str, Enum):
 
 class QueueMessage(BaseModel):
     type: BuilderCommands
-    data: dict
-    metadata: dict
+    data: Optional[dict] = None
+    metadata: Optional[dict] = None
+
+
+class BuilderResponse(BaseModel):
+    type: BuildStatus
+    data: Optional[dict] = None
+    metadata: Optional[dict] = None
 
 
 class BuildMessage(QueueMessage):
-    train_id: str
+    id: str
     user_id: Union[str, int]
-    proposal_id: int
+    user_rsa_secret_id: str
+    user_paillier_secret_id: str
+    proposal_id: Union[int, str]
     stations: List[str]
     files: List[str]
     master_image: str
@@ -56,8 +64,10 @@ class BuildMessage(QueueMessage):
             type=message_dict.get("type"),
             data=data,
             metadata=message_dict.get("metadata"),
-            train_id=data["trainId"],
+            id=data["id"],
             user_id=data["userId"],
+            user_paillier_secret_id=data.get("userPaillierSecretId"),
+            user_rsa_secret_id=data.get("userRsaSecretId"),
             proposal_id=data["proposalId"],
             stations=data["stations"],
             files=data["files"],
@@ -69,8 +79,6 @@ class BuildMessage(QueueMessage):
             hash=data["hash"],
             hash_signed=data["hashSigned"],
             query=data.get("query"),
-            user_he_key=data.get("user_he_key")
-
         )
 
 

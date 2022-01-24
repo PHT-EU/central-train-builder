@@ -11,7 +11,9 @@ def build_message():
         "metadata": {},
         "data": {
             "userId": 5,
-            "trainId": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
+            "id": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
+            "userRsaSecretId": "test-rsa",
+            "userPaillierSecretId": "test-paillier",
             "proposalId": 4,
             "stations": [
                 "1"
@@ -40,7 +42,9 @@ def build_message_query():
         "metadata": {},
         "data": {
             "userId": 5,
-            "trainId": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
+            "userRsaSecretId": "test-rsa",
+            "userPaillierSecretId": "test-paillier",
+            "id": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
             "proposalId": 4,
             "stations": [
                 "1"
