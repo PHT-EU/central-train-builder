@@ -18,6 +18,11 @@ class BuildStatus(str, Enum):
     STOPPED = "trainBuildStopped"
 
 
+class MessageData(BaseModel):
+    message: str
+    id: str
+
+
 class QueueMessage(BaseModel):
     type: BuilderCommands
     data: Optional[dict] = None
@@ -26,6 +31,12 @@ class QueueMessage(BaseModel):
 
 class BuilderResponse(BaseModel):
     type: BuildStatus
+    data: Optional[dict] = None
+    metadata: Optional[dict] = None
+
+
+class RouterMessage(BaseModel):
+    type: str
     data: Optional[dict] = None
     metadata: Optional[dict] = None
 

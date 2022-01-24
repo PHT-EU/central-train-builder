@@ -162,9 +162,6 @@ def test_process_status_message(builder):
     assert response.type == BuildStatus.NOT_FOUND
 
 
-
-
-
 def test_generate_config(builder, build_msg):
     # generate test user and secrets in vault
     user_secrets = {
@@ -189,7 +186,7 @@ def test_generate_config(builder, build_msg):
         )
         print(response.text)
 
-    config = builder.generate_config(build_msg)
+    config, query = builder.generate_config_and_query(build_msg)
 
     assert config.user_keys.rsa_public_key == user_secrets["rsa_public_key"]
 
@@ -197,4 +194,27 @@ def test_generate_config(builder, build_msg):
 
 
 def test_build(builder, build_msg):
-    pass
+    # train id not found
+    invalid_msg = {
+        "type": "trainBuildStart",
+        "data": {
+            "hello": "random"
+        }
+    }
+
+    response = builder.process_message(invalid_msg)
+    assert response.type == BuildStatus.NOT_FOUND
+
+    # invalid build data
+    invalid_msg = {
+        "type": "trainBuildStart",
+        "data": {
+            "id": "random",
+            "hello": "world"
+        }
+    }
+
+    response = builder.process_message(invalid_msg)
+    assert response.type == BuildStatus.FAILED
+
+    response = builder.process_message(msg=build_msg.dict())

@@ -98,3 +98,10 @@ class BuilderRedisStore:
 
     def set_build_status(self, train_id: str, status: BuildStatus) -> None:
         self.redis.set(f"{train_id}-buildStatus", status.value)
+
+    def train_submitted(self, train_id: str) -> bool:
+        if self.redis.exists(f"{train_id}-submitted") == 1:
+            return True
+        else:
+            self.redis.set(f"{train_id}-submitted", "true")
+            return False
