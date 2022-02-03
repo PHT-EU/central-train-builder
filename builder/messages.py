@@ -41,56 +41,55 @@ class RouterMessage(BaseModel):
     metadata: Optional[dict] = None
 
 
-class BuildMessage(QueueMessage):
+class BuildMessage(BaseModel):
     id: str
     user_id: Union[str, int]
     user_rsa_secret_id: str
-    user_paillier_secret_id: str
+    user_paillier_secret_id: Optional[str] = None
     proposal_id: Union[int, str]
     stations: List[str]
     files: List[str]
     master_image: str
-    entrypoint_executable: str
+    entrypoint_command: str
     entrypoint_path: str
-    entrypoint_args: Optional[List[str]]
+    entrypoint_command_arguments: Optional[List[str]] = None
     session_id: str
     hash: str
     hash_signed: str
     query: Optional[dict] = None
-    user_he_key: Optional[str] = None
 
-    @classmethod
-    def parse_raw(cls: Type['BuildMessage'], b: StrBytes, *, content_type: str = None, encoding: str = 'utf8',
-                  proto: Protocol = None, allow_pickle: bool = False) -> 'BuildMessage':
-        if content_type == "str" and encoding != "utf8":
-            return cls.from_json(b.encode(encoding))
-
-        return cls.from_json(b)
-
-    @classmethod
-    def from_json(cls: Type['BuildMessage'], json_message: Union[dict, str, bytes]) -> 'BuildMessage':
-        message_dict = load_json_dict(json_message)
-        data = message_dict.get("data")
-        return cls(
-            type=message_dict.get("type"),
-            data=data,
-            metadata=message_dict.get("metadata"),
-            id=data["id"],
-            user_id=data["userId"],
-            user_paillier_secret_id=data.get("userPaillierSecretId"),
-            user_rsa_secret_id=data.get("userRsaSecretId"),
-            proposal_id=data["proposalId"],
-            stations=data["stations"],
-            files=data["files"],
-            master_image=data["masterImage"],
-            entrypoint_executable=data["entrypointExecutable"],
-            entrypoint_args=data.get("entrypointCommandArguments"),
-            entrypoint_path=data["entrypointPath"],
-            session_id=data["sessionId"],
-            hash=data["hash"],
-            hash_signed=data["hashSigned"],
-            query=data.get("query"),
-        )
+    # @classmethod
+    # def parse_raw(cls: Type['BuildMessage'], b: StrBytes, *, content_type: str = None, encoding: str = 'utf8',
+    #               proto: Protocol = None, allow_pickle: bool = False) -> 'BuildMessage':
+    #     if content_type == "str" and encoding != "utf8":
+    #         return cls.from_json(b.encode(encoding))
+    #
+    #     return cls.from_json(b)
+    #
+    # @classmethod
+    # def from_json(cls: Type['BuildMessage'], json_message: Union[dict, str, bytes]) -> 'BuildMessage':
+    #     message_dict = load_json_dict(json_message)
+    #     data = message_dict.get("data")
+    #     return cls(
+    #         type=message_dict.get("type"),
+    #         data=data,
+    #         metadata=message_dict.get("metadata"),
+    #         id=data["id"],
+    #         user_id=data["userId"],
+    #         user_paillier_secret_id=data.get("userPaillierSecretId"),
+    #         user_rsa_secret_id=data.get("userRsaSecretId"),
+    #         proposal_id=data["proposalId"],
+    #         stations=data["stations"],
+    #         files=data["files"],
+    #         master_image=data["masterImage"],
+    #         entrypoint_executable=data["entrypointExecutable"],
+    #         entrypoint_args=data.get("entrypointCommandArguments"),
+    #         entrypoint_path=data["entrypointPath"],
+    #         session_id=data["sessionId"],
+    #         hash=data["hash"],
+    #         hash_signed=data["hashSigned"],
+    #         query=data.get("query"),
+    #     )
 
 
 def load_json_dict(json_message: Union[dict, str, bytes]) -> dict:

@@ -73,7 +73,8 @@ class TrainBuilder:
 
         if message.type == BuilderCommands.START:
             try:
-                build_message = BuildMessage(**msg)
+                build_message = BuildMessage(**msg["data"])
+                logger.debug(f"Build message: {build_message}")
             except ValidationError as e:
                 logger.error(f"Invalid build message: {e}")
                 status = BuildStatus.FAILED
@@ -169,6 +170,9 @@ class TrainBuilder:
             logger.info(f"Train {config.train_id} - Adding config and query")
             config_archive, query_archive = self._make_config_and_query_archive(config, query)
             # add config
+            if os.getenv("OLD_CONFIG"):
+                config_archive = self._make_train_config_old(build_message=build_message)
+
             container.put_archive(path="/opt", data=config_archive)
             if query_archive:
                 container.put_archive(path=TrainPaths.TRAIN_DIR.value, data=query_archive)
@@ -198,7 +202,8 @@ class TrainBuilder:
     def _submit_train_images(self, container: Container, train_id: str):
         # tag the container into images
         logger.info(f"Train {train_id} - Committing container")
-        repo = f"{self.registry_url}/{INCOMING_REPOSITORY}/{train_id}"
+
+        repo = f"{self.registry_url.split('//')[-1]}/{INCOMING_REPOSITORY}/{train_id}"
         container.commit(repository=repo, tag="latest")
         container.commit(repository=repo, tag="base")
 
@@ -300,24 +305,12 @@ class TrainBuilder:
         logger.info(f"Building base image for Train - {build_message.id}")
         docker_file_obj = self._make_dockerfile(
             master_image=build_message.master_image,
-            command_args=build_message.entrypoint_args,
+            command_args=build_message.entrypoint_command_arguments,
             entrypoint_file=build_message.entrypoint_path,
-            command=build_message.entrypoint_executable,
+            command=build_message.entrypoint_command,
         )
         image, logs = self.docker_client.images.build(fileobj=docker_file_obj)
         return image, logs
-
-    def get_train_status(self, train_id: str):
-
-        status = self._get_redis_status(train_id)
-        logger.info(f"Getting status for train: {train_id} --> {status}")
-        message = {
-            "type": status,
-            "data": {
-                "trainId": train_id
-            }
-        }
-        return message
 
     def _validate_setup(self):
         fields = vars(self)
@@ -325,28 +318,6 @@ class TrainBuilder:
         for key in fields:
             if not fields[key]:
                 raise ValueError(f"Instance variable {key} could not be initialized.")
-
-    def _add_train_files(self, container: Container, train_id, config_archive, query_archive=None):
-        """
-        Get a tar archive containing uploaded train files from the central service and place them in the
-        specified container. The previously generated config and query files are also added to the container
-
-        :param container: docker Container object to which to add the files
-        :param train_id: id of the train for querying the files from the central server
-        :param config_archive: tar archive containing a json file
-        :param query_archive: tar archive containing the json definition of a fhir query
-        :return:
-        """
-
-        logger.info(f"Train: {train_id} -- Adding files to container")
-        # Get the train files from pht API
-        train_archive = self.pht_client.get_train_files_archive(train_id=train_id, token=self.service_key,
-                                                                client_id=self.client_id)
-        container.put_archive("/opt/pht_train", train_archive)
-        container.wait()
-        container.put_archive("/opt", config_archive)
-        if query_archive:
-            container.put_archive("/opt/pht_train", query_archive)
 
     def get_train_files_archive(self, train_id: str) -> BytesIO:
 
@@ -372,9 +343,10 @@ class TrainBuilder:
 
         :return:
         """
-        url = f"{self.api_url}{train_id}/files/download"
+        url = f"{self.api_url}/trains/{train_id}/files/download"
         headers = self._create_api_headers(api_token=self.service_key, client_id=self.client_id)
         with requests.get(url, headers=headers, stream=True) as r:
+            print(r.text)
             r.raise_for_status()
             file_obj = BytesIO()
             for chunk in r.iter_content():
@@ -383,11 +355,17 @@ class TrainBuilder:
 
         return file_obj
 
-    @staticmethod
-    def _create_api_headers(api_token: str, client_id: str = "TRAIN_BUILDER") -> dict:
-        auth_string = f"{client_id}:{api_token}"
-        auth_string = base64.b64encode(auth_string.encode("utf-8")).decode()
-        headers = {"Authorization": f"Basic {auth_string}"}
+    def _create_api_headers(self, api_token: str, client_id: str = "TRAIN_BUILDER") -> dict:
+        # auth_string = f"{client_id}:{api_token}"
+        # auth_string = base64.b64encode(auth_string.encode("utf-8")).decode()
+        token_url = f"{self.api_url}/token"
+        print(token_url)
+        print(self.client_id, self.service_key)
+        r = requests.post(f"{self.api_url}/token", data={"id": self.client_id, "secret": self.service_key})
+        print("requesting token")
+        print(r.json())
+        token = r.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
         return headers
 
     def _make_dockerfile(self, master_image: str, command: str, entrypoint_file: str, command_args: List[str] = None):
@@ -423,11 +401,13 @@ class TrainBuilder:
 
         secret = self.vault_client.secrets.kv.v1.read_secret(
             path="TRAIN_BUILDER",
-            mount_point="services"
+            mount_point="robots"
         )
         client_data = secret["data"]
-        self.service_key = client_data["clientSecret"]
-        self.client_id = client_data["clientId"]
+        self.service_key = client_data["secret"]
+        self.client_id = client_data["id"]
+
+
 
     def _make_route(self, train_id: str, build_message: BuildMessage):
         # todo add periodic options
@@ -436,3 +416,59 @@ class TrainBuilder:
             stations=build_message.stations,
         )
         return route
+
+    def _make_train_config_old(self, build_message: BuildMessage = None):
+        """
+        Generate a tar archive containing a json file train_config.json in which the relevant security values for the
+        train will be stored
+
+        :param build_data: dictionary containing build data sent from the central ui
+        :param meta_data:
+        :return:
+        """
+
+        logger.info(f"Train: {build_message.id} -- Generating train config")
+
+        user_keys = self._get_user_keys(
+            user_id=build_message.user_id,
+            rsa_key_id=build_message.user_rsa_secret_id,
+            pallier_key_id=build_message.user_paillier_secret_id
+        )
+
+        station_public_keys = self._get_public_keys_for_stations(build_message.stations)
+
+        station_pks = {spk.station_id: spk.rsa_public_key for spk in station_public_keys}
+
+        config = {
+            "master_image": build_message.master_image,
+            "user_id": build_message.user_id,
+            "train_id": build_message.id,
+            "session_id": build_message.session_id,
+            "rsa_user_public_key": user_keys.rsa_public_key,
+            "encrypted_key": None,
+            "rsa_public_keys": station_pks,
+            "e_h": build_message.hash,
+            "e_h_sig": build_message.hash_signed,
+            "e_d": None,
+            "e_d_sig": None,
+            "digital_signature": None,
+            "proposal_id": build_message.proposal_id,
+            "user_he_key": user_keys.rsa_public_key,
+            "immutable_file_list": build_message.files
+        }
+
+        config_archive = BytesIO()
+        tar = tarfile.open(fileobj=config_archive, mode="w")
+        # transform  to bytesIo containing binary json data
+        config = BytesIO(json.dumps(config, indent=2).encode("utf-8"))
+
+        # Create TarInfo Object based on the data
+        config_file = TarInfo(name="train_config.json")
+        config_file.size = config.getbuffer().nbytes
+        config_file.mtime = time.time()
+        # add config data and reset the archive
+        tar.addfile(config_file, config)
+        tar.close()
+        config_archive.seek(0)
+
+        return config_archive
