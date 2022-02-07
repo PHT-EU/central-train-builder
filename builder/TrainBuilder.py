@@ -134,8 +134,8 @@ class TrainBuilder:
 
         logger.info("Vault client initialized")
 
-        logger.info("Requesting service token")
-        self._get_service_token()
+        logger.info("Requesting service credentials from vault")
+        self._get_service_credentials()
         logger.info("Service token obtained")
 
         self.api_url = os.getenv("UI_TRAIN_API")
@@ -187,6 +187,10 @@ class TrainBuilder:
             return BuilderResponse(type=BuildStatus.FINISHED, data={"id": build_message.id})
         except Exception as e:
             logger.error(f"Error building train {build_message.id} - {e}")
+            try:
+                container.remove(force=True)
+            except Exception as e:
+                logger.error(f"Error removing container - {e}")
             return BuilderResponse(type=BuildStatus.FAILED, data={"id": build_message.id, "error": str(e)})
 
     def _make_config_and_query_archive(self, config: TrainConfig, query: dict):
@@ -273,7 +277,6 @@ class TrainBuilder:
     def _ensure_master_image(self, build_message: BuildMessage):
         logger.info(f"Ensuring master image - {build_message.master_image} is available...")
         master_image_repo = self._make_master_image_tag(build_message.master_image)
-        print(master_image_repo)
         self.docker_client.images.pull(master_image_repo, tag="latest")
 
     def _get_user_keys(self, user_id: str, rsa_key_id: str, pallier_key_id: str = None) -> UserPublicKeys:
@@ -327,7 +330,7 @@ class TrainBuilder:
         except HTTPError:
             logger.error(f"Error getting train files from central API")
             logger.info(f"Attempting to refresh service credentials")
-            self._get_service_token()
+            self._get_service_credentials()
             train_archive = self._get_tar_archive_from_api(train_id)
 
         return train_archive
@@ -344,7 +347,7 @@ class TrainBuilder:
         :return:
         """
         url = f"{self.api_url}/trains/{train_id}/files/download"
-        headers = self._create_api_headers(api_token=self.service_key, client_id=self.client_id)
+        headers = self._create_api_headers()
         with requests.get(url, headers=headers, stream=True) as r:
             print(r.text)
             r.raise_for_status()
@@ -355,16 +358,17 @@ class TrainBuilder:
 
         return file_obj
 
-    def _create_api_headers(self, api_token: str, client_id: str = "TRAIN_BUILDER") -> dict:
-        # auth_string = f"{client_id}:{api_token}"
-        # auth_string = base64.b64encode(auth_string.encode("utf-8")).decode()
-        token_url = f"{self.api_url}/token"
-        print(token_url)
-        print(self.client_id, self.service_key)
-        r = requests.post(f"{self.api_url}/token", data={"id": self.client_id, "secret": self.service_key})
-        print("requesting token")
-        print(r.json())
-        token = r.json()["access_token"]
+    def _create_api_headers(self) -> dict:
+
+        token = self.redis_store.get_cached_token()
+        if not token:
+            token_url = f"{self.api_url}/token"
+            logger.info(f"No token found in cache. Attempting to refresh token from {token_url}")
+            r = requests.post(f"{self.api_url}/token", data={"id": self.client_id, "secret": self.service_key})
+            logger.debug(f"Token refresh response: {r.text}")
+            token = r.json()["access_token"]
+        else:
+            logger.info(f"Found token in cache. Using cached token")
         headers = {"Authorization": f"Bearer {token}"}
         return headers
 
@@ -392,7 +396,7 @@ class TrainBuilder:
 
         return file_obj
 
-    def _get_service_token(self):
+    def _get_service_credentials(self):
         """
         Gets the service token from vault to allow the train builder to authenticate against the central API
 
@@ -406,8 +410,6 @@ class TrainBuilder:
         client_data = secret["data"]
         self.service_key = client_data["secret"]
         self.client_id = client_data["id"]
-
-
 
     def _make_route(self, train_id: str, build_message: BuildMessage):
         # todo add periodic options

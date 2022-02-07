@@ -78,7 +78,7 @@ def test_get_service_token(builder):
 
     assert key, client_id
 
-    builder._get_service_token()
+    builder._get_service_credentials()
 
     assert builder.service_key == key
     assert builder.client_id == client_id

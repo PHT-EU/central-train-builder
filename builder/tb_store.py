@@ -1,11 +1,12 @@
 from typing import List, Optional, Union, Callable, Any
 from redis import Redis
-from loguru import logger
 from enum import Enum
 from hvac import Client
 from pydantic import BaseModel
 
 from builder.messages import BuildStatus
+
+TB_TOKEN_CACHE_KEY = "tb_token"
 
 
 class VaultEngines(Enum):
@@ -105,3 +106,9 @@ class BuilderRedisStore:
         else:
             self.redis.set(f"{train_id}-submitted", "true")
             return False
+
+    def set_cached_token(self, token: str) -> None:
+        self.redis.set(TB_TOKEN_CACHE_KEY, token, ex=3600)
+
+    def get_cached_token(self):
+        self.redis.get(TB_TOKEN_CACHE_KEY)
