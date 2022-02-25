@@ -10,7 +10,7 @@ import requests
 from io import BytesIO
 from docker.models.containers import Container
 import json
-from tarfile import TarInfo, TarFile
+from tarfile import TarInfo
 import time
 from dotenv import load_dotenv, find_dotenv
 import logging
@@ -19,8 +19,7 @@ from hvac import Client
 from pydantic import ValidationError
 from requests import HTTPError
 
-from train_lib.clients import PHTClient
-from train_lib.security.train_config import TrainConfig, HexString, UserPublicKeys, StationPublicKeys
+from train_lib.security.train_config import TrainConfig, UserPublicKeys, StationPublicKeys
 
 from builder.messages import QueueMessage, BuilderCommands, BuildMessage, BuilderResponse
 from builder.tb_store import BuildStatus, BuilderRedisStore, BuilderVaultStore, VaultRoute
