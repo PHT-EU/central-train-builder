@@ -14,7 +14,7 @@ loguru = "*"
 hvac = "*"
 pydantic = "*"
 PyJWT = "*"
-
+pht-train-container-library = "*"
 
 [dev-packages]
 pytest = "*"
