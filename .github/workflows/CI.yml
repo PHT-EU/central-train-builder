@@ -36,13 +36,16 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          # Maps port 6379 on service container to the host
+          - 6379:6379
     env:
       VAULT_URL: ${{ secrets.VAULT_URL }}
       VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
       HARBOR_URL: ${{ secrets.HARBOR_URL }}
       HARBOR_USER: ${{ secrets.HARBOR_USER }}
       HARBOR_PW: ${{ secrets.HARBOR_PW }}
-      REDIS_HOST: redis
+      REDIS_HOST: localhost
       OLD_CONFIG: true
       REDIS_PORT: 6379
 
