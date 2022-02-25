@@ -3,6 +3,7 @@ from redis import Redis
 from enum import Enum
 from hvac import Client
 from pydantic import BaseModel
+from loguru import logger
 
 from builder.messages import BuildStatus
 
@@ -51,13 +52,6 @@ class BuilderVaultStore:
             rsa_public_key=user_pk["data"].get(rsa_key_id),
             paillier_public_key=user_pk["data"].get(paillier_key_id))
 
-    # def get_user_public_keys(self, user_ids: List[str]) -> List[VaultUserPublicKey]:
-    #     user_pks = []
-    #     for user_id in user_ids:
-    #         user_pks.append(self.get_user_public_key(user_id))
-    #
-    #     return user_pks
-
     def get_station_public_key(self, station_id: str) -> VaultStationPublicKey:
         station_pk = self.client.secrets.kv.v1.read_secret(
             path=station_id,
@@ -82,7 +76,7 @@ class BuilderVaultStore:
             path=train_id,
             secret=json_secret,
         )
-        print(response)
+        logger.debug(f"Added route {train_id} to vault: Response: {response}")
 
 
 class BuilderRedisStore:

@@ -4,6 +4,7 @@ import pprint
 import pytest
 from dotenv import load_dotenv, find_dotenv
 from hvac import Client
+from pydantic import ValidationError
 
 from builder.TrainBuilder import TrainBuilder
 from builder.messages import BuildMessage, BuildStatus, BuilderCommands
@@ -27,9 +28,8 @@ def build_msg(test_user_id, test_station_ids):
         "type": "trainBuildStart",
         "metadata": {},
         "data": {
-            "user_id": 5,
-            "user_rsa_secret_id": "test-rsa",
-            "userPaillierSecretId": "test-paillier",
+            "user_id": test_user_id,
+            "user_rsa_secret_id": "rsa-test",
             "id": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
             "proposal_id": 4,
             "stations": [
@@ -171,8 +171,7 @@ def test_process_status_message(builder):
 def test_generate_config(builder, build_msg):
     # generate test user and secrets in vault
     user_secrets = {
-        "paillier_public_key": "37289717391827659",
-        "rsa_public_key": os.urandom(32).hex(),
+        "rsa-test": os.urandom(32).hex(),
     }
 
     builder.vault_client.secrets.kv.v1.create_or_update_secret(
@@ -194,7 +193,7 @@ def test_generate_config(builder, build_msg):
 
     config, query = builder.generate_config_and_query(build_msg)
 
-    assert config.user_keys.rsa_public_key == user_secrets["rsa_public_key"]
+    assert config.user_keys.rsa_public_key == user_secrets["rsa-test"]
 
     assert config
 
@@ -220,7 +219,7 @@ def test_build(builder, build_msg):
         }
     }
 
+
     response = builder.process_message(invalid_msg)
     assert response.type == BuildStatus.FAILED
 
-    response = builder.process_message(msg=build_msg.dict())

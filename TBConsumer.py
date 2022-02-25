@@ -89,7 +89,7 @@ class TBConsumer(Consumer):
 def main():
     load_dotenv(find_dotenv())
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-    tb_consumer = TBConsumer(os.getenv("AMPQ_URL"), "", routing_key="tb")
+    tb_consumer = TBConsumer(os.getenv("AMQP_URL"), "", routing_key="tb")
     # os.getenv("UI_TRAIN_API")
     tb_consumer.run()
 

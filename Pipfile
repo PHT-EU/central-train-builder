@@ -20,6 +20,7 @@ pht-train-container-library = "*"
 pytest = "*"
 coverage = "*"
 bump2version = "*"
+flake8 = "*"
 
 [requires]
 python_version = "3.9"
