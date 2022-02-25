@@ -48,6 +48,7 @@ class TBConsumer(Consumer):
         logger.info(f"Received message: \n {message}")
         response = self.builder.process_message(message)
 
+        print(response)
         # post message to train router to notify that the train has been built
         if response.type == BuildStatus.FINISHED.value:
             # check if the train has been already submitted if not notify the train router via rabbitmq

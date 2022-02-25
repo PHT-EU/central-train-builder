@@ -85,8 +85,9 @@ class TrainBuilder:
                 self.vault_store.add_route(train_id, route)
             return response
         elif message.type == BuilderCommands.STOP:
-            # todo stop build
-            pass
+            # todo actually stop the build
+            self.redis_store.set_build_status(train_id, BuildStatus.STOPPED)
+            return BuilderResponse(type=BuildStatus.STOPPED, data={"id": train_id})
         elif message.type == BuilderCommands.STATUS:
             if self.redis_store.train_exists(train_id):
                 status = self.redis_store.get_build_status(train_id=train_id)
@@ -183,6 +184,9 @@ class TrainBuilder:
 
             # commit the container, tag it and push it to the registry
             self._submit_train_images(container, build_message.id)
+
+            # set the build status as finished
+            self.redis_store.set_build_status(build_message.id, BuildStatus.FINISHED)
 
             return BuilderResponse(type=BuildStatus.FINISHED, data={"id": build_message.id})
         except Exception as e:
@@ -349,7 +353,6 @@ class TrainBuilder:
         url = f"{self.api_url}/trains/{train_id}/files/download"
         headers = self._create_api_headers()
         with requests.get(url, headers=headers, stream=True) as r:
-            print(r.text)
             r.raise_for_status()
             file_obj = BytesIO()
             for chunk in r.iter_content():
