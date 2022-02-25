@@ -44,6 +44,7 @@ jobs:
       HARBOR_PW: ${{ secrets.HARBOR_PW }}
       REDIS_HOST: redis
       OLD_CONFIG: true
+      REDIS_PORT: 6379
 
 
     steps:

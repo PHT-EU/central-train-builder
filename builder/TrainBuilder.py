@@ -45,6 +45,7 @@ class TrainBuilder:
     harbor_user: str
     harbor_password: str
     redis_host: str
+    redis_port: int
 
     docker_client: docker.DockerClient
     vault_client: Client = None
@@ -142,7 +143,8 @@ class TrainBuilder:
 
         logger.info("Connecting to redis")
         self.redis_host = os.getenv("REDIS_HOST")
-        self.redis = redis.Redis(host=self.redis_host, decode_responses=True)
+        self.redis_port = int(os.getenv("REDIS_PORT", 6379))
+        self.redis = redis.Redis(host=self.redis_host, port=self.redis_port, decode_responses=True)
         logger.info("Redis connection established. Setting up store...")
         self.redis_store = BuilderRedisStore(self.redis)
         logger.info("Redis store initialized")
