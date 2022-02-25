@@ -79,7 +79,7 @@ class TBConsumer(Consumer):
         message = {
             "type": "trainBuilt",
             "data": {
-                "trainId": train_id
+                "id": train_id
             }
         }
 
