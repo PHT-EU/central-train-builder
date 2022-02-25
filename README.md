@@ -1,7 +1,7 @@
 [![Build and push image](https://github.com/PHT-Medic/central-train-builder/actions/workflows/CI.yml/badge.svg)](https://github.com/PHT-Medic/central-train-builder/actions/workflows/CI.yml)
 [![CodeQL](https://github.com/PHT-Medic/central-train-builder/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/PHT-Medic/central-train-builder/actions/workflows/codeql-analysis.yml)
 [![Vulnerability Scan](https://github.com/PHT-Medic/central-train-builder/actions/workflows/image_scan.yml/badge.svg)](https://github.com/PHT-Medic/central-train-builder/actions/workflows/image_scan.yml)
-
+[![codecov](https://codecov.io/gh/PHT-Medic/central-train-builder/branch/master/graph/badge.svg?token=B3QQACAM7K)](https://codecov.io/gh/PHT-Medic/central-train-builder)
 # TrainBuilder Service
 This repository contains the TrainBuilder class responsible for building valid train images based on the configuration 
 selected in the user interface, as well as the train algorithm files submitted to the UI.
