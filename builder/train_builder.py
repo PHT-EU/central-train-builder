@@ -403,7 +403,6 @@ class TrainBuilder:
         if not token:
             token_url = f"{self.api_url}/token"
             logger.info(f"No token found in cache. Attempting to refresh token from {token_url}")
-            print(self.client_id, self.service_key)
             r = requests.post(f"{self.api_url}/token", data={"id": self.client_id, "secret": self.service_key})
             logger.debug(f"Token refresh response: {r.text}")
             token = r.json()["access_token"]
