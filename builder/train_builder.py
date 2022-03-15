@@ -3,7 +3,7 @@ import os
 import tarfile
 from enum import Enum
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 import docker
 import redis
 import requests
@@ -19,9 +19,9 @@ from hvac import Client
 from pydantic import ValidationError
 from requests import HTTPError
 
-from train_lib.security.train_config import TrainConfig, UserPublicKeys, StationPublicKeys
+from train_lib.security.train_config import TrainConfig, UserPublicKeys, StationPublicKeys, Ecosystem, RouteEntry
 
-from builder.messages import QueueMessage, BuilderCommands, BuildMessage, BuilderResponse
+from builder.messages import QueueMessage, BuilderCommands, BuildMessage, BuilderResponse, MetaBuildMessage, Station
 from builder.tb_store import BuildStatus, BuilderRedisStore, BuilderVaultStore, VaultRoute
 
 LOGGER = logging.getLogger(__name__)
@@ -84,6 +84,12 @@ class TrainBuilder:
                 route = self._make_route(train_id, build_message)
                 self.vault_store.add_route(train_id, route)
             return response
+
+        elif message.type == BuilderCommands.META:
+            logger.info(f"Registering meta train {train_id}")
+            response = self._register_meta_train(train_id, message.data)
+            if response:
+                return response
         elif message.type == BuilderCommands.STOP:
             # todo actually stop the build
             self.redis_store.set_build_status(train_id, BuildStatus.STOPPED)
@@ -169,7 +175,7 @@ class TrainBuilder:
 
             # update the container with config and query
             logger.info(f"Train {build_message.id} - Creating train image...")
-            logger.info(f"Train {config.train_id} - Adding config and query")
+            logger.info(f"Train {config.id} - Adding config and query")
             config_archive, query_archive = self._make_config_and_query_archive(config, query)
             # add config
             if os.getenv("OLD_CONFIG"):
@@ -179,7 +185,7 @@ class TrainBuilder:
             if query_archive:
                 container.put_archive(path=TrainPaths.TRAIN_DIR.value, data=query_archive)
             # get train files and add them to the container
-            logger.info(f"Train {config.train_id} - Adding train files")
+            logger.info(f"Train {config.id} - Adding train files")
             train_archive = self.get_train_files_archive(build_message.id)
             container.put_archive(path=TrainPaths.TRAIN_DIR.value, data=train_archive)
 
@@ -190,22 +196,22 @@ class TrainBuilder:
             self.redis_store.set_build_status(build_message.id, BuildStatus.FINISHED)
 
             return BuilderResponse(type=BuildStatus.FINISHED, data={"id": build_message.id})
-        except Exception as e:
-            logger.error(f"Error building train {build_message.id} - {e}")
+        except Exception as e1:
+            logger.error(f"Error building train {build_message.id} - {e1}")
             try:
                 container.remove(force=True)
-            except Exception as e:
-                logger.error(f"Error removing container - {e}")
-            return BuilderResponse(type=BuildStatus.FAILED, data={"id": build_message.id, "error": str(e)})
+            except Exception as e2:
+                logger.error(f"Error removing container - {e2}")
+            return BuilderResponse(type=BuildStatus.FAILED, data={"id": build_message.id, "error": str(e1)})
 
     def _make_config_and_query_archive(self, config: TrainConfig, query: dict):
 
-        config_archive = self._make_json_archive(config.dict(), "train_config.json")
+        config_archive = self._make_json_archive(config.dict(by_alias=True), "train_config.json")
         query_archive = None
         if query:
-            query_archive = self._make_json_archive(query, "train_config.json")
+            query_archive = self._make_json_archive(query, "query.json")
         else:
-            logger.info(f"Train {config.train_id} - No query submitted")
+            logger.info(f"Train {config.id} - No query submitted")
         return config_archive, query_archive
 
     def _submit_train_images(self, container: Container, train_id: str):
@@ -257,27 +263,55 @@ class TrainBuilder:
         config = TrainConfig.construct()
 
         # transcribe values from build message
-        config.train_id = build_message.id
-        config.master_image = build_message.master_image
-        config.user_id = build_message.user_id
-        config.immutable_file_list = build_message.files
+        config.id = build_message.id
+        config.source = {
+            "type": "docker_repository",
+            "address": build_message.master_image,
+            "tag": "latest"
+        }
+        # write immutable file specifications
+        config.file_list = build_message.files
         config.immutable_file_hash = build_message.hash
         config.immutable_file_signature = build_message.hash_signed
 
         # get the station and user keys
-        config.user_keys = self._get_user_keys(
+        user_keys = self._get_user_keys(
             user_id=build_message.user_id,
             rsa_key_id=build_message.user_rsa_secret_id,
             pallier_key_id=build_message.user_paillier_secret_id
         )
-        config.station_public_keys = self._get_public_keys_for_stations(build_message.stations)
+        # set them in the config
+        config.creator = {
+            "id": build_message.user_id,
+            "rsa_public_key": user_keys.rsa_public_key,
+            "paillier_public_key": user_keys.paillier_public_key
+        }
+
+        # create the route
+        config.route = self._make_config_route(build_message.stations)
 
         config.proposal_id = build_message.proposal_id
         config.session_id = build_message.session_id
         # validate config
-        config = TrainConfig(**config.dict())
+        config = TrainConfig(**config.dict(by_alias=True))
 
         return config, build_message.query
+
+    def _make_config_route(self, stations: List[Station]) -> List[RouteEntry]:
+        logger.info(f"Generating route for Train {stations}")
+        station_pks = self._get_public_keys_for_stations(stations)
+        route = []
+        for station, pks in zip(stations, station_pks):
+            ecosystem = "tue" if station.ecosystem.value == "tue" else "aac"
+            route.append(
+                RouteEntry(
+                    station=station.id,
+                    eco_system=ecosystem,
+                    index=station.index,
+                    rsa_public_key=pks.rsa_public_key,
+                )
+            )
+        return route
 
     def _ensure_master_image(self, build_message: BuildMessage):
         logger.info(f"Ensuring master image - {build_message.master_image} is available...")
@@ -293,14 +327,15 @@ class TrainBuilder:
         )
         return user_keys
 
-    def _get_public_keys_for_stations(self, station_ids: List[str]) -> List[StationPublicKeys]:
+    def _get_public_keys_for_stations(self, stations: List[Station]) -> List[StationPublicKeys]:
         station_pks = []
-        vault_keys = self.vault_store.get_station_public_keys(station_ids)
-        for key in vault_keys:
+        vault_keys = self.vault_store.get_station_public_keys([s.id for s in stations])
+        for key, station in zip(vault_keys, stations):
             station_pks.append(
                 StationPublicKeys(
                     station_id=key.station_id,
                     rsa_public_key=key.rsa_public_key,
+                    eco_system="tue" if station.ecosystem.value == "tue" else "aac",
                 )
             )
         return station_pks
@@ -368,7 +403,6 @@ class TrainBuilder:
         if not token:
             token_url = f"{self.api_url}/token"
             logger.info(f"No token found in cache. Attempting to refresh token from {token_url}")
-            print(self.client_id, self.service_key)
             r = requests.post(f"{self.api_url}/token", data={"id": self.client_id, "secret": self.service_key})
             logger.debug(f"Token refresh response: {r.text}")
             token = r.json()["access_token"]
@@ -416,11 +450,14 @@ class TrainBuilder:
         self.service_key = client_data["secret"]
         self.client_id = client_data["id"]
 
-    def _make_route(self, train_id: str, build_message: BuildMessage):
+    def _make_route(self, train_id: str, build_message: Union[BuildMessage, MetaBuildMessage]):
         # todo add periodic options
+        # sort stations by their index before creating the route
+        sorted_stations = sorted(build_message.stations, key=lambda station: station.index)
+        stations = [stop.id if stop.ecosystem == Ecosystem.TUE else "interop" for stop in sorted_stations]
         route = VaultRoute(
             repository_suffix=train_id,
-            stations=build_message.stations,
+            stations=stations,
         )
         return route
 
@@ -479,3 +516,25 @@ class TrainBuilder:
         config_archive.seek(0)
 
         return config_archive
+
+    def _register_meta_train(self, train_id: str, data: dict) -> BuilderResponse:
+        meta_build_message = MetaBuildMessage(**data)
+        try:
+
+            if self.redis_store.train_exists(train_id):
+                return None
+            else:
+                # creating route from build message and adding to vault
+                logger.info(f"Train: {train_id} -- Registering meta train in vault")
+                route = self._make_route(train_id, meta_build_message)
+                self.vault_store.add_route(train_id, route)
+
+                logger.info(f"Train: {train_id} -- finished registering meta train in vault")
+                self.redis_store.set_build_status(meta_build_message.id, BuildStatus.FINISHED)
+
+                return BuilderResponse(type=BuildStatus.FINISHED, data={"id": meta_build_message.id})
+
+        except Exception as e:
+            logger.error(f"Train: {train_id} -- Error registering meta train in vault: {e}")
+            self.redis_store.set_build_status(meta_build_message.id, BuildStatus.FAILED)
+            return BuilderResponse(type=BuildStatus.FAILED, data={"id": meta_build_message.id})

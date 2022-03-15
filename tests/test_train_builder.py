@@ -6,7 +6,7 @@ from dotenv import load_dotenv, find_dotenv
 from hvac import Client
 from pydantic import ValidationError
 
-from builder.TrainBuilder import TrainBuilder
+from builder.train_builder import TrainBuilder
 from builder.messages import BuildMessage, BuildStatus, BuilderCommands
 from builder.tb_store import VaultEngines
 
@@ -33,7 +33,11 @@ def build_msg(test_user_id, test_station_ids):
             "id": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
             "proposal_id": 4,
             "stations": [
-                "1"
+                {
+                    "id": "test-station",
+                    "ecosystem": "tue",
+                    "index": 1
+                }
             ],
             "files": [
                 "test_train/entrypoint.py",
@@ -180,12 +184,12 @@ def test_generate_config(builder, build_msg):
         secret=user_secrets
     )
 
-    for station_id in build_msg.stations:
+    for station in build_msg.stations:
         station_secret = {
-            "rsa_public_key": station_id.encode().hex(),
+            "rsa_public_key": station.id.encode().hex(),
         }
         response = builder.vault_client.secrets.kv.v1.create_or_update_secret(
-            path=station_id,
+            path=station.id,
             mount_point=VaultEngines.STATIONS.value,
             secret=station_secret
         )
@@ -193,7 +197,7 @@ def test_generate_config(builder, build_msg):
 
     config, query = builder.generate_config_and_query(build_msg)
 
-    assert config.user_keys.rsa_public_key == user_secrets["rsa-test"]
+    assert config.creator.rsa_public_key == user_secrets["rsa-test"]
 
     assert config
 
@@ -219,7 +223,5 @@ def test_build(builder, build_msg):
         }
     }
 
-
     response = builder.process_message(invalid_msg)
     assert response.type == BuildStatus.FAILED
-

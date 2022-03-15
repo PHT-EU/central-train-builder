@@ -5,7 +5,7 @@ import json
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
-from builder.TrainBuilder import TrainBuilder, BuildStatus
+from builder.train_builder import TrainBuilder, BuildStatus
 from loguru import logger
 
 from builder.messages import BuilderResponse
@@ -48,13 +48,13 @@ class TBConsumer(Consumer):
         logger.info(f"Received message: \n {message}")
         response = self.builder.process_message(message)
 
-        print(response)
-        # post message to train router to notify that the train has been built
-        if response.type == BuildStatus.FINISHED.value:
-            # check if the train has been already submitted if not notify the train router via rabbitmq
-            if not self.builder.redis_store.train_submitted(response.data["id"]):
-                self.post_message_for_train_router(response.data["id"])
-        self.publish_events_for_train(response)
+        if response:
+            # post message to train router to notify that the train has been built
+            if response.type == BuildStatus.FINISHED.value:
+                # check if the train has been already submitted if not notify the train router via rabbitmq
+                if not self.builder.redis_store.train_submitted(response.data["id"]):
+                    self.post_message_for_train_router(response.data["id"])
+            self.publish_events_for_train(response)
         super().on_message(_unused_channel, basic_deliver, properties, body)
 
     def publish_events_for_train(self, response: BuilderResponse, exchange: str = "pht",
