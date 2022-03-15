@@ -8,6 +8,7 @@ class BuilderCommands(str, Enum):
     START = "trainBuildStart"
     STOP = "trainBuildStop"
     STATUS = "trainBuildStatus"
+    META = "trainMetaBuild"
 
 
 class BuildStatus(str, Enum):
@@ -16,6 +17,11 @@ class BuildStatus(str, Enum):
     FINISHED = "trainBuildFinished"
     NOT_FOUND = "trainNotFound"
     STOPPED = "trainBuildStopped"
+
+
+class EcoSystem(str, Enum):
+    TUE = "tue"
+    PADME = "padme"
 
 
 class MessageData(BaseModel):
@@ -41,13 +47,19 @@ class RouterMessage(BaseModel):
     metadata: Optional[dict] = None
 
 
+class Station(BaseModel):
+    id: str
+    ecosystem: EcoSystem
+    index: int
+
+
 class BuildMessage(BaseModel):
     id: str
     user_id: Union[str, int]
     user_rsa_secret_id: str
     user_paillier_secret_id: Optional[str] = None
     proposal_id: Union[int, str]
-    stations: List[str]
+    stations: List[Station]
     files: List[str]
     master_image: str
     entrypoint_command: str
@@ -57,6 +69,11 @@ class BuildMessage(BaseModel):
     hash: str
     hash_signed: str
     query: Optional[dict] = None
+
+
+class MetaBuildMessage(BaseModel):
+    id: str
+    stations: List[Station]
 
     # @classmethod
     # def parse_raw(cls: Type['BuildMessage'], b: StrBytes, *, content_type: str = None, encoding: str = 'utf8',

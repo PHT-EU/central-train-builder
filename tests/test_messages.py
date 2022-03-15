@@ -16,7 +16,11 @@ def build_message():
             "id": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
             "proposal_id": 4,
             "stations": [
-                "1"
+                {
+                    "id": "test-station",
+                    "ecosystem": "tue",
+                    "index": 1
+                }
             ],
             "files": [
                 "test_train/entrypoint.py",
@@ -47,7 +51,12 @@ def build_message_query():
             "id": "da8fd868-0fed-42e3-b6d8-5abbf0864d4a",
             "proposal_id": 4,
             "stations": [
-                "1"
+                {
+                    "id": "test-station",
+                    "ecosystem": "tue",
+                    "index": 1
+
+                }
             ],
             "files": [
                 "test_train/entrypoint.py",
