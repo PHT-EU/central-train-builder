@@ -15,6 +15,7 @@ hvac = "*"
 pydantic = "*"
 PyJWT = "*"
 pht-train-container-library = "*"
+ecs-logging = "*"
 
 [dev-packages]
 pytest = "*"

@@ -18,6 +18,9 @@ from loguru import logger
 from hvac import Client
 from pydantic import ValidationError
 from requests import HTTPError
+import ecs_logging
+from builder.log_try import *
+from datetime import datetime, timedelta
 
 from train_lib.security.train_config import TrainConfig, UserPublicKeys, StationPublicKeys, Ecosystem, RouteEntry
 
@@ -55,10 +58,39 @@ class TrainBuilder:
 
     def __init__(self):
         load_dotenv(find_dotenv())
+
+        # Start logging process
+        datetime_today = datetime.today().strftime("%Y-%m-%d")
+        self.delete_logs(f'logs_test/train_builder_json_{datetime_today}.log')
+        logger_id = self.start_logging_to_file(f'logs_test/train_builder_json_{datetime_today}.log')
+        #logger.remove(logger_id)
+
         # Run setup
         self._setup()
 
         assert self.vault_url and self.vault_token and self.registry_url
+
+    def start_logging_to_file(self, log_filepath: str):
+        fh = logging.FileHandler(log_filepath)
+        formatter = ecs_logging.StdlibFormatter()
+        fh.setFormatter(formatter)
+        return logger.add(fh, format="{message}")
+
+    def delete_logs(self, log_filepath: str):
+        try:
+            os.remove(log_filepath)
+        except OSError:
+            pass
+
+    def log_rotation(self, filepath: str):
+        file = open(filepath, "r+")
+        file.seek(0, 2)
+        if file.tell() > 100:
+            return True
+        #if message.record["time"].time() > datetime.time(12, 0, 0):
+        #    return True
+        return False
+
 
     def process_message(self, msg: dict) -> BuilderResponse:
 
@@ -110,6 +142,7 @@ class TrainBuilder:
         """
         # Connect to redis either in docker-compose container or on localhost
         logger.info("Initializing docker client and logging into registry")
+        create_logs()
         self.docker_client = docker.client.from_env()
         self.registry_url = os.getenv("HARBOR_URL")
         self.registry_domain = self.registry_url.split("//")[1]

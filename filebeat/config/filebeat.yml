@@ -1,0 +1,50 @@
+## Filebeat configuration
+## https://github.com/elastic/beats/blob/master/deploy/docker/filebeat.docker.yml
+
+filebeat.config:
+  modules:
+    path: ${path.config}/modules.d/*.yml
+    reload.enabled: false
+
+filebeat.autodiscover:
+  providers:
+    # The Docker autodiscover provider automatically retrieves logs from Docker
+    # containers as they start and stop.
+    - type: docker
+      hints.enabled: true
+
+filebeat.inputs:
+  - type: log
+    paths:
+      - ${FILEBEAT_LOGS_PATH_CONTAINER}
+    tags: ${FILEBEAT_TAG_LOGS}
+    fields:
+        logging_test: true
+    json.keys_under_root: true
+    json.overwrite_keys: true
+    json.add_error_key: true
+    json.expand_keys: true
+
+
+reload.enabled: true
+reload.period: 15s
+
+processors:
+  - add_cloud_metadata: ~
+
+setup.kibana:
+  host: ${KIBANA_HOST}
+  username: ${KIBANA_USER}
+  password: ${KIBANA_SYSTEM_PASSWORD}
+
+output.elasticsearch:
+  hosts: ${ELASTIC_HOST}
+  username: ${ELASTIC_USER}
+  password: ${ELASTIC_PASSWORD}
+
+
+## HTTP endpoint for health checking
+## https://www.elastic.co/guide/en/beats/filebeat/current/http-endpoint.html
+
+http.enabled: true
+http.host: 0.0.0.0

@@ -225,3 +225,4 @@ def test_build(builder, build_msg):
 
     response = builder.process_message(invalid_msg)
     assert response.type == BuildStatus.FAILED
+

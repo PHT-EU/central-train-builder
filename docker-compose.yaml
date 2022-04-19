@@ -1,4 +1,4 @@
-version: '3'
+version: '3.5'
 services:
   train_builder:
     container_name: train_builder
@@ -25,3 +25,39 @@ services:
       - "RABBITMQ_DEFAULT_VHOST=/"
       - "RABBITMQ_ERLANG_COOKIE=admin"
       - "RABBITMQ_NODENAME=rabbit"
+
+  filebeat:
+    build:
+      context: filebeat/
+      args:
+        ELASTIC_VERSION: ${ELASTIC_VERSION}
+    user: root
+    command:
+      # Log to stderr.
+      - -e
+      - --strict.perms=false
+    volumes:
+      - ./filebeat/config/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro,Z
+      - ${FILEBEAT_LOGS_PATH_LOCALLY}
+      - type: bind
+        source: /var/lib/docker/containers
+        target: /var/lib/docker/containers
+        read_only: true
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+    ports:
+      - ${FILEBEAT_PORT}:5044
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-}
+    networks:
+      - proxynet
+    env_file:
+      - .env
+
+
+networks:
+  proxynet:
+    external:
+      name: elk
